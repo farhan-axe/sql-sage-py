@@ -15,7 +15,8 @@ interface DatabaseParseResult {
 
 export async function connectToServer(config: SqlConnectionConfig): Promise<string[]> {
   try {
-    const response = await fetch('/api/sql/connect', {
+    // Update the URL to point to your actual backend API endpoint
+    const response = await fetch('http://localhost:3001/api/sql/connect', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -37,7 +38,8 @@ export async function connectToServer(config: SqlConnectionConfig): Promise<stri
 
 export async function parseDatabase(server: string, database: string, useWindowsAuth: boolean, credentials?: { username: string; password: string }): Promise<DatabaseParseResult> {
   try {
-    const response = await fetch('/api/sql/parse', {
+    // Update the URL to point to your actual backend API endpoint
+    const response = await fetch('http://localhost:3001/api/sql/parse', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
