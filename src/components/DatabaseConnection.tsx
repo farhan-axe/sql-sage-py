@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import type { DatabaseInfo } from "@/types/database";
 
 interface DatabaseConnectionProps {
@@ -16,6 +17,7 @@ interface DatabaseConnectionProps {
 const DatabaseConnection = ({ onConnect, isParsing, setIsParsing }: DatabaseConnectionProps) => {
   const { toast } = useToast();
   const [server, setServer] = useState("");
+  const [authType, setAuthType] = useState("windows"); // "windows" or "sql"
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [selectedDb, setSelectedDb] = useState("");
@@ -104,27 +106,49 @@ Here are the details of the tables:
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="username">Username</Label>
-        <Input
-          id="username"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-        />
+        <Label>Authentication Type</Label>
+        <RadioGroup
+          value={authType}
+          onValueChange={setAuthType}
+          className="grid grid-cols-1 gap-4"
+        >
+          <div className="flex items-center space-x-2">
+            <RadioGroupItem value="windows" id="windows" />
+            <Label htmlFor="windows">Windows Authentication</Label>
+          </div>
+          <div className="flex items-center space-x-2">
+            <RadioGroupItem value="sql" id="sql" />
+            <Label htmlFor="sql">SQL Server Authentication</Label>
+          </div>
+        </RadioGroup>
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="password">Password</Label>
-        <Input
-          id="password"
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-      </div>
+      {authType === "sql" && (
+        <>
+          <div className="space-y-2">
+            <Label htmlFor="username">Username</Label>
+            <Input
+              id="username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="password">Password</Label>
+            <Input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </div>
+        </>
+      )}
 
       <Button 
         onClick={handleConnect}
-        disabled={!server || !username || !password || isConnecting}
+        disabled={!server || (authType === "sql" && (!username || !password)) || isConnecting}
         className="w-full"
       >
         {isConnecting ? "Connecting..." : "Connect"}
