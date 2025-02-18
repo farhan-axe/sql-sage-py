@@ -29,19 +29,45 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
 
     setIsLoading(true);
     try {
-      // Mock query generation and execution
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      const mockQuery = "SELECT s.date, s.amount, c.name \nFROM Sales s \nJOIN Customers c ON s.customer_id = c.id \nWHERE s.date >= DATEADD(year, -1, GETDATE()) \nORDER BY s.date DESC";
-      setGeneratedQuery(mockQuery);
-      
-      // Mock results
-      const mockResults = [
-        { date: "2023-12-15", amount: 1500, name: "John Doe" },
-        { date: "2023-11-20", amount: 2300, name: "Jane Smith" },
-        { date: "2023-10-05", amount: 1800, name: "Bob Johnson" },
-      ];
-      setQueryResults(mockResults);
+      // First, generate the SQL query using the API
+      const generateResponse = await fetch('http://localhost:3001/api/sql/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          question,
+          databaseInfo
+        }),
+      });
+
+      if (!generateResponse.ok) {
+        throw new Error('Failed to generate query');
+      }
+
+      const { query } = await generateResponse.json();
+      setGeneratedQuery(query);
+
+      // Execute the generated query
+      const executeResponse = await fetch('http://localhost:3001/api/sql/execute', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          query,
+          databaseInfo
+        }),
+      });
+
+      if (!executeResponse.ok) {
+        throw new Error('Failed to execute query');
+      }
+
+      const { results } = await executeResponse.json();
+      setQueryResults(results);
       
       toast({
         title: "Query executed successfully",
@@ -49,9 +75,10 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to generate or execute query",
+        description: error instanceof Error ? error.message : "Failed to generate or execute query",
         variant: "destructive",
       });
+      console.error('Query error:', error);
     }
     setIsLoading(false);
   };
