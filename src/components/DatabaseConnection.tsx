@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { connectToServer, parseDatabase } from "@/services/sqlServer";
 import type { DatabaseInfo } from "@/types/database";
 
 interface DatabaseConnectionProps {
@@ -27,9 +28,13 @@ const DatabaseConnection = ({ onConnect, isParsing, setIsParsing }: DatabaseConn
   const handleConnect = async () => {
     setIsConnecting(true);
     try {
-      // Mock connection for demo
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setDatabases(["Sales", "Inventory", "CustomerDB"]);
+      const dbs = await connectToServer({
+        server,
+        useWindowsAuth: authType === "windows",
+        ...(authType === "sql" && { username, password }),
+      });
+      
+      setDatabases(dbs);
       toast({
         title: "Connected successfully",
         description: "You can now select a database",
@@ -37,9 +42,10 @@ const DatabaseConnection = ({ onConnect, isParsing, setIsParsing }: DatabaseConn
     } catch (error) {
       toast({
         title: "Connection failed",
-        description: "Please check your credentials",
+        description: "Please check your credentials and try again",
         variant: "destructive",
       });
+      console.error('Connection error:', error);
     }
     setIsConnecting(false);
   };
@@ -47,38 +53,14 @@ const DatabaseConnection = ({ onConnect, isParsing, setIsParsing }: DatabaseConn
   const handleParseDatabase = async () => {
     setIsParsing(true);
     try {
-      // Mock parsing for demo
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      const mockInfo: DatabaseInfo = {
-        tables: [
-          {
-            name: "Sales",
-            schema: ["id", "date", "amount", "customer_id"],
-            primaryKey: "id",
-            example: "SELECT * FROM Sales WHERE date > '2023-01-01'"
-          },
-          {
-            name: "Customers",
-            schema: ["id", "name", "email"],
-            primaryKey: "id",
-            example: "SELECT name, email FROM Customers WHERE id = 1"
-          }
-        ],
-        promptTemplate: `You are a professional SQL query generator for SQL Server. 
-Here are the details of the tables:
-
-1. Sales Table
-   Schema: id, date, amount, customer_id
-   Primary Key: id
-   Example: SELECT * FROM Sales WHERE date > '2023-01-01'
-
-2. Customers Table
-   Schema: id, name, email
-   Primary Key: id
-   Example: SELECT name, email FROM Customers WHERE id = 1`
-      };
+      const dbInfo = await parseDatabase(
+        server,
+        selectedDb,
+        authType === "windows",
+        authType === "sql" ? { username, password } : undefined
+      );
       
-      onConnect(mockInfo);
+      onConnect(dbInfo);
       toast({
         title: "Database parsed successfully",
         description: "You can now start querying the database",
@@ -89,6 +71,7 @@ Here are the details of the tables:
         description: "Error parsing database schema",
         variant: "destructive",
       });
+      console.error('Parsing error:', error);
     }
     setIsParsing(false);
   };
