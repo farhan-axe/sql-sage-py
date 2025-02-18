@@ -20,6 +20,7 @@ export async function connectToServer(config: SqlConnectionConfig): Promise<stri
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Accept': 'application/json'
       },
       body: JSON.stringify(config),
     });
@@ -43,6 +44,7 @@ export async function parseDatabase(server: string, database: string, useWindows
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Accept': 'application/json'
       },
       body: JSON.stringify({
         server,
