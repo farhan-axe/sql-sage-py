@@ -19,9 +19,9 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
   const [queryResults, setQueryResults] = useState<any[] | null>(null);
 
   const handleQueryGeneration = async () => {
-    if (!question.trim()) {
+    if (!question.trim() || !databaseInfo) {
       toast({
-        title: "Please enter a question",
+        title: "Please enter a question and ensure database is connected",
         variant: "destructive",
       });
       return;
@@ -38,7 +38,14 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
         },
         body: JSON.stringify({
           question,
-          databaseInfo
+          databaseInfo: {
+            ...databaseInfo,
+            server: databaseInfo.connectionConfig.server,
+            database: databaseInfo.connectionConfig.database,
+            useWindowsAuth: databaseInfo.connectionConfig.useWindowsAuth,
+            username: databaseInfo.connectionConfig.username,
+            password: databaseInfo.connectionConfig.password
+          }
         }),
       });
 
@@ -49,7 +56,7 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
       const { query } = await generateResponse.json();
       setGeneratedQuery(query);
 
-      // Execute the generated query
+      // Execute the generated query with the connection info
       const executeResponse = await fetch('http://localhost:3001/api/sql/execute', {
         method: 'POST',
         headers: {
@@ -58,12 +65,19 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
         },
         body: JSON.stringify({
           query,
-          databaseInfo
+          databaseInfo: {
+            server: databaseInfo.connectionConfig.server,
+            database: databaseInfo.connectionConfig.database,
+            useWindowsAuth: databaseInfo.connectionConfig.useWindowsAuth,
+            username: databaseInfo.connectionConfig.username,
+            password: databaseInfo.connectionConfig.password
+          }
         }),
       });
 
       if (!executeResponse.ok) {
-        throw new Error('Failed to execute query');
+        const errorData = await executeResponse.json();
+        throw new Error(errorData.detail || 'Failed to execute query');
       }
 
       const { results } = await executeResponse.json();
