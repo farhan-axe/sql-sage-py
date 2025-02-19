@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/components/ui/use-toast";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { connectToServer, parseDatabase } from "@/services/sqlServer";
-import type { DatabaseInfo } from "@/types/database";
+import type { DatabaseInfo, ConnectionConfig } from "@/types/database";
 
 interface DatabaseConnectionProps {
   onConnect: (info: DatabaseInfo) => void;
@@ -53,25 +53,26 @@ const DatabaseConnection = ({ onConnect, isParsing, setIsParsing }: DatabaseConn
   const handleParseDatabase = async () => {
     setIsParsing(true);
     try {
-      const dbInfo = await parseDatabase(
+      const parseResult = await parseDatabase(
         server,
         selectedDb,
         authType === "windows",
         authType === "sql" ? { username, password } : undefined
       );
-      
-      // Create the complete DatabaseInfo object
-      const completeDbInfo: DatabaseInfo = {
-        ...dbInfo,
-        connectionConfig: {
-          server,
-          database: selectedDb,
-          useWindowsAuth: authType === "windows",
-          ...(authType === "sql" && { username, password })
-        }
+
+      const connectionConfig: ConnectionConfig = {
+        server,
+        database: selectedDb,
+        useWindowsAuth: authType === "windows",
+        ...(authType === "sql" && { username, password })
       };
       
-      onConnect(completeDbInfo);
+      const databaseInfo: DatabaseInfo = {
+        ...parseResult,
+        connectionConfig
+      };
+      
+      onConnect(databaseInfo);
       toast({
         title: "Database parsed successfully",
         description: "You can now start querying the database",

@@ -1,5 +1,5 @@
 
-import { DatabaseInfo, TableInfo } from "@/types/database";
+import { DatabaseInfo, TableInfo, ConnectionConfig } from "@/types/database";
 
 interface SqlConnectionConfig {
   server: string;
@@ -31,12 +31,17 @@ export async function connectToServer(config: SqlConnectionConfig): Promise<stri
   }
 }
 
+interface DatabaseParseResult {
+  tables: TableInfo[];
+  promptTemplate: string;
+}
+
 export async function parseDatabase(
   server: string,
   database: string,
   useWindowsAuth: boolean,
   credentials?: { username: string; password: string }
-): Promise<{ tables: TableInfo[]; promptTemplate: string }> {
+): Promise<DatabaseParseResult> {
   try {
     const response = await fetch('http://localhost:3001/api/sql/parse', {
       method: 'POST',
