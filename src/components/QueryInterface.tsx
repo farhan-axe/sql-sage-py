@@ -18,7 +18,7 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const [queryResults, setQueryResults] = useState<any[] | null>(null);
 
-  const fetchWithTimeout = async (url: string, options: RequestInit, timeout = 30000) => {
+  const fetchWithTimeout = async (url: string, options: RequestInit, timeout = 60000) => {
     const controller = new AbortController();
     const id = setTimeout(() => controller.abort(), timeout);
 
@@ -50,7 +50,13 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
     }
 
     setIsLoading(true);
+    setGeneratedQuery(""); // Clear any previous query
+    setQueryResults(null); // Clear any previous results
+    
     try {
+      console.log("Starting query generation...");
+      console.log("Database info:", databaseInfo);
+      
       // First, generate the SQL query using the API
       const generateResponse = await fetchWithTimeout(
         'http://localhost:3001/api/sql/generate',
@@ -72,17 +78,20 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
             }
           }),
         },
-        30000 // 30 second timeout
+        60000 // Increased to 60 second timeout
       );
 
       if (!generateResponse.ok) {
-        throw new Error('Failed to generate query');
+        const errorData = await generateResponse.json();
+        throw new Error(errorData.detail || 'Failed to generate query');
       }
 
       const { query } = await generateResponse.json();
+      console.log("Generated query:", query);
       setGeneratedQuery(query);
 
       // Execute the generated query with the connection info
+      console.log("Executing query...");
       const executeResponse = await fetchWithTimeout(
         'http://localhost:3001/api/sql/execute',
         {
@@ -102,7 +111,7 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
             }
           }),
         },
-        30000 // 30 second timeout
+        60000 // Increased to 60 second timeout
       );
 
       if (!executeResponse.ok) {
@@ -111,6 +120,7 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
       }
 
       const { results } = await executeResponse.json();
+      console.log("Query results:", results);
       setQueryResults(results);
       
       toast({
@@ -124,13 +134,13 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
         if (error.message === 'Request timed out') {
           errorMessage = "The request took too long to complete. Please try again.";
         }
+        console.error('Detailed error:', error);
       }
       toast({
         title: "Error",
         description: errorMessage,
         variant: "destructive",
       });
-      console.error('Query error:', error);
       return;
     }
     setIsLoading(false);
