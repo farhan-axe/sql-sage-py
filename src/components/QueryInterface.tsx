@@ -68,14 +68,7 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
           },
           body: JSON.stringify({
             question,
-            databaseInfo: {
-              ...databaseInfo,
-              server: databaseInfo.connectionConfig.server,
-              database: databaseInfo.connectionConfig.database,
-              useWindowsAuth: databaseInfo.connectionConfig.useWindowsAuth,
-              username: databaseInfo.connectionConfig.username,
-              password: databaseInfo.connectionConfig.password
-            }
+            databaseInfo
           }),
         },
         60000 // Increased to 60 second timeout
