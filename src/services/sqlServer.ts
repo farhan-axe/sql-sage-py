@@ -8,14 +8,8 @@ interface SqlConnectionConfig {
   password?: string;
 }
 
-interface DatabaseParseResult {
-  tables: TableInfo[];
-  promptTemplate: string;
-}
-
 export async function connectToServer(config: SqlConnectionConfig): Promise<string[]> {
   try {
-    // Update the URL to point to your actual backend API endpoint
     const response = await fetch('http://localhost:3001/api/sql/connect', {
       method: 'POST',
       headers: {
@@ -37,9 +31,13 @@ export async function connectToServer(config: SqlConnectionConfig): Promise<stri
   }
 }
 
-export async function parseDatabase(server: string, database: string, useWindowsAuth: boolean, credentials?: { username: string; password: string }): Promise<DatabaseParseResult> {
+export async function parseDatabase(
+  server: string,
+  database: string,
+  useWindowsAuth: boolean,
+  credentials?: { username: string; password: string }
+): Promise<{ tables: TableInfo[]; promptTemplate: string }> {
   try {
-    // Update the URL to point to your actual backend API endpoint
     const response = await fetch('http://localhost:3001/api/sql/parse', {
       method: 'POST',
       headers: {

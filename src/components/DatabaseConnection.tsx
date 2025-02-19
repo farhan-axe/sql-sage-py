@@ -60,7 +60,18 @@ const DatabaseConnection = ({ onConnect, isParsing, setIsParsing }: DatabaseConn
         authType === "sql" ? { username, password } : undefined
       );
       
-      onConnect(dbInfo);
+      // Create the complete DatabaseInfo object
+      const completeDbInfo: DatabaseInfo = {
+        ...dbInfo,
+        connectionConfig: {
+          server,
+          database: selectedDb,
+          useWindowsAuth: authType === "windows",
+          ...(authType === "sql" && { username, password })
+        }
+      };
+      
+      onConnect(completeDbInfo);
       toast({
         title: "Database parsed successfully",
         description: "You can now start querying the database",
