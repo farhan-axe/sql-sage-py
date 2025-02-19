@@ -18,6 +18,28 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const [queryResults, setQueryResults] = useState<any[] | null>(null);
 
+  const fetchWithTimeout = async (url: string, options: RequestInit, timeout = 30000) => {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeout);
+
+    try {
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal
+      });
+      clearTimeout(id);
+      return response;
+    } catch (error) {
+      clearTimeout(id);
+      if (error instanceof Error) {
+        if (error.name === 'AbortError') {
+          throw new Error('Request timed out');
+        }
+      }
+      throw error;
+    }
+  };
+
   const handleQueryGeneration = async () => {
     if (!question.trim() || !databaseInfo) {
       toast({
@@ -30,24 +52,28 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
     setIsLoading(true);
     try {
       // First, generate the SQL query using the API
-      const generateResponse = await fetch('http://localhost:3001/api/sql/generate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
+      const generateResponse = await fetchWithTimeout(
+        'http://localhost:3001/api/sql/generate',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({
+            question,
+            databaseInfo: {
+              ...databaseInfo,
+              server: databaseInfo.connectionConfig.server,
+              database: databaseInfo.connectionConfig.database,
+              useWindowsAuth: databaseInfo.connectionConfig.useWindowsAuth,
+              username: databaseInfo.connectionConfig.username,
+              password: databaseInfo.connectionConfig.password
+            }
+          }),
         },
-        body: JSON.stringify({
-          question,
-          databaseInfo: {
-            ...databaseInfo,
-            server: databaseInfo.connectionConfig.server,
-            database: databaseInfo.connectionConfig.database,
-            useWindowsAuth: databaseInfo.connectionConfig.useWindowsAuth,
-            username: databaseInfo.connectionConfig.username,
-            password: databaseInfo.connectionConfig.password
-          }
-        }),
-      });
+        30000 // 30 second timeout
+      );
 
       if (!generateResponse.ok) {
         throw new Error('Failed to generate query');
@@ -57,23 +83,27 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
       setGeneratedQuery(query);
 
       // Execute the generated query with the connection info
-      const executeResponse = await fetch('http://localhost:3001/api/sql/execute', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
+      const executeResponse = await fetchWithTimeout(
+        'http://localhost:3001/api/sql/execute',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({
+            query,
+            databaseInfo: {
+              server: databaseInfo.connectionConfig.server,
+              database: databaseInfo.connectionConfig.database,
+              useWindowsAuth: databaseInfo.connectionConfig.useWindowsAuth,
+              username: databaseInfo.connectionConfig.username,
+              password: databaseInfo.connectionConfig.password
+            }
+          }),
         },
-        body: JSON.stringify({
-          query,
-          databaseInfo: {
-            server: databaseInfo.connectionConfig.server,
-            database: databaseInfo.connectionConfig.database,
-            useWindowsAuth: databaseInfo.connectionConfig.useWindowsAuth,
-            username: databaseInfo.connectionConfig.username,
-            password: databaseInfo.connectionConfig.password
-          }
-        }),
-      });
+        30000 // 30 second timeout
+      );
 
       if (!executeResponse.ok) {
         const errorData = await executeResponse.json();
@@ -87,12 +117,21 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
         title: "Query executed successfully",
       });
     } catch (error) {
+      setIsLoading(false);
+      let errorMessage = "Failed to generate or execute query";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+        if (error.message === 'Request timed out') {
+          errorMessage = "The request took too long to complete. Please try again.";
+        }
+      }
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to generate or execute query",
+        description: errorMessage,
         variant: "destructive",
       });
       console.error('Query error:', error);
+      return;
     }
     setIsLoading(false);
   };
