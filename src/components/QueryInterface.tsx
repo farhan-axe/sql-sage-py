@@ -41,17 +41,36 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
   };
 
   const extractSQLQuery = (text: string): string => {
-    // Remove markdown SQL blocks if present
-    text = text.replace(/```sql/gi, '').replace(/```/g, '');
-    
-    // Remove any explanatory text before or after the query
-    const queryLines = text.split('\n').filter(line => 
-      line.trim() !== '' && 
-      !line.toLowerCase().includes('here') &&
-      !line.toLowerCase().includes('query:') &&
-      !line.toLowerCase().includes('sql query:')
-    );
-    
+    // First, try to extract query from SQL code blocks
+    const sqlBlockMatch = text.match(/```sql\s*([\s\S]*?)\s*```/i);
+    if (sqlBlockMatch) {
+      return sqlBlockMatch[1].trim();
+    }
+
+    // If no SQL blocks found, try to extract query starting with SQL keywords
+    const sqlKeywords = ['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'WITH'];
+    const lines = text.split('\n');
+    const queryLines = [];
+    let foundQuery = false;
+
+    for (const line of lines) {
+      const upperLine = line.toUpperCase().trim();
+      
+      // Start capturing when we find a SQL keyword
+      if (sqlKeywords.some(keyword => upperLine.startsWith(keyword))) {
+        foundQuery = true;
+      }
+
+      // If we're in query mode and line isn't empty or explanatory text
+      if (foundQuery && 
+          line.trim() !== '' && 
+          !line.toLowerCase().includes('here') &&
+          !line.toLowerCase().includes('query:') &&
+          !line.toLowerCase().includes('sql query:')) {
+        queryLines.push(line);
+      }
+    }
+
     return queryLines.join('\n').trim();
   };
 
@@ -96,6 +115,11 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
       const { query } = await generateResponse.json();
       const cleanedQuery = extractSQLQuery(query);
       console.log("Generated query:", cleanedQuery);
+      
+      if (!cleanedQuery) {
+        throw new Error('Failed to extract a valid SQL query from the response');
+      }
+      
       setGeneratedQuery(cleanedQuery);
 
       // Execute the generated query
