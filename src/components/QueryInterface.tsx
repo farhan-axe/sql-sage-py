@@ -28,6 +28,12 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
         signal: controller.signal
       });
       clearTimeout(id);
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+      }
+      
       return response;
     } catch (error) {
       clearTimeout(id);
@@ -97,23 +103,16 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Accept': 'application/json'
           },
           body: JSON.stringify({
             question,
             databaseInfo
           }),
-        },
-        120000 // Increased timeout to 120 seconds for Ollama
+        }
       );
 
-      if (!generateResponse.ok) {
-        const errorData = await generateResponse.json();
-        throw new Error(errorData.detail || 'Failed to generate query');
-      }
-
-      const { query } = await generateResponse.json();
-      const cleanedQuery = extractSQLQuery(query);
+      const generatedData = await generateResponse.json();
+      const cleanedQuery = extractSQLQuery(generatedData.query);
       console.log("Generated query:", cleanedQuery);
       
       if (!cleanedQuery) {
@@ -123,33 +122,24 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
       setGeneratedQuery(cleanedQuery);
 
       // Execute the generated query
-      console.log("Executing query...");
+      console.log("Executing query with config:", {
+        query: cleanedQuery,
+        databaseInfo: databaseInfo.connectionConfig
+      });
+
       const executeResponse = await fetchWithTimeout(
         'http://localhost:3001/api/sql/execute',
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Accept': 'application/json'
           },
           body: JSON.stringify({
             query: cleanedQuery,
-            databaseInfo: {
-              server: databaseInfo.connectionConfig.server,
-              database: databaseInfo.connectionConfig.database,
-              useWindowsAuth: databaseInfo.connectionConfig.useWindowsAuth,
-              username: databaseInfo.connectionConfig.username,
-              password: databaseInfo.connectionConfig.password
-            }
+            databaseInfo: databaseInfo.connectionConfig
           }),
-        },
-        60000
+        }
       );
-
-      if (!executeResponse.ok) {
-        const errorData = await executeResponse.json();
-        throw new Error(errorData.detail || 'Failed to execute query');
-      }
 
       const { results } = await executeResponse.json();
       console.log("Query results:", results);
@@ -159,13 +149,10 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
         title: "Query executed successfully",
       });
     } catch (error) {
-      setIsLoading(false);
+      console.error("Error during query generation/execution:", error);
       let errorMessage = "Failed to generate or execute query";
       if (error instanceof Error) {
         errorMessage = error.message;
-        if (error.message === 'Request timed out') {
-          errorMessage = "The request took too long to complete. Please try again.";
-        }
         console.error('Detailed error:', error);
       }
       toast({
@@ -173,9 +160,9 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
         description: errorMessage,
         variant: "destructive",
       });
-      return;
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
   if (!isConnected || !databaseInfo) {
@@ -220,7 +207,10 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
       )}
 
       {queryResults && (
-        <DataDisplay data={queryResults} />
+        <div className="mt-6">
+          <h3 className="text-sm font-medium text-gray-700 mb-2">Query Results</h3>
+          <DataDisplay data={queryResults} />
+        </div>
       )}
     </div>
   );
