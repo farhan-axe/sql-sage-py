@@ -18,7 +18,7 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const [queryResults, setQueryResults] = useState<any[] | null>(null);
 
-  const fetchWithTimeout = async (url: string, options: RequestInit, timeout = 60000) => {
+  const fetchWithTimeout = async (url: string, options: RequestInit, timeout = 120000) => {
     const controller = new AbortController();
     const id = setTimeout(() => controller.abort(), timeout);
 
@@ -40,6 +40,21 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
     }
   };
 
+  const extractSQLQuery = (text: string): string => {
+    // Remove markdown SQL blocks if present
+    text = text.replace(/```sql/gi, '').replace(/```/g, '');
+    
+    // Remove any explanatory text before or after the query
+    const queryLines = text.split('\n').filter(line => 
+      line.trim() !== '' && 
+      !line.toLowerCase().includes('here') &&
+      !line.toLowerCase().includes('query:') &&
+      !line.toLowerCase().includes('sql query:')
+    );
+    
+    return queryLines.join('\n').trim();
+  };
+
   const handleQueryGeneration = async () => {
     if (!question.trim() || !databaseInfo) {
       toast({
@@ -55,7 +70,6 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
     
     try {
       console.log("Starting query generation...");
-      console.log("Database info:", databaseInfo);
       
       // First, generate the SQL query using the API
       const generateResponse = await fetchWithTimeout(
@@ -71,7 +85,7 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
             databaseInfo
           }),
         },
-        60000 // Increased to 60 second timeout
+        120000 // Increased timeout to 120 seconds for Ollama
       );
 
       if (!generateResponse.ok) {
@@ -80,10 +94,11 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
       }
 
       const { query } = await generateResponse.json();
-      console.log("Generated query:", query);
-      setGeneratedQuery(query);
+      const cleanedQuery = extractSQLQuery(query);
+      console.log("Generated query:", cleanedQuery);
+      setGeneratedQuery(cleanedQuery);
 
-      // Execute the generated query with the connection info
+      // Execute the generated query
       console.log("Executing query...");
       const executeResponse = await fetchWithTimeout(
         'http://localhost:3001/api/sql/execute',
@@ -94,7 +109,7 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
             'Accept': 'application/json'
           },
           body: JSON.stringify({
-            query,
+            query: cleanedQuery,
             databaseInfo: {
               server: databaseInfo.connectionConfig.server,
               database: databaseInfo.connectionConfig.database,
@@ -104,7 +119,7 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
             }
           }),
         },
-        60000 // Increased to 60 second timeout
+        60000
       );
 
       if (!executeResponse.ok) {
