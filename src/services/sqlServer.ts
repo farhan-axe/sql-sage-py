@@ -86,11 +86,18 @@ export async function parseDatabase(
 
 async function generateTableDescription(tableName: string, schema: string[]): Promise<string> {
   try {
-    // Prepare the prompt for the backend LLM
+    // Improved prompt for the backend LLM for more specific table descriptions
     const prompt = `Given a database table named "${tableName}" with the following schema:
 ${schema.join(', ')}
 
-In a single sentence of 15-20 words, explain the likely purpose of this table.`;
+Create a clear and specific description (15-20 words) that accurately explains:
+1. The exact purpose of this table
+2. What data it stores
+3. Its role in the database (e.g., fact table, dimension table, junction table)
+
+Focus on being precise and specific rather than generic. For example:
+- Bad: "Table containing Customer data"
+- Good: "Stores customer demographic details and contact information for active purchasers"`;
 
     // Request the table description from the backend
     const response = await fetch('http://localhost:3001/api/sql/generate-description', {
@@ -104,15 +111,15 @@ In a single sentence of 15-20 words, explain the likely purpose of this table.`;
     });
 
     if (!response.ok) {
-      return `Table containing ${tableName} data`;
+      return `Stores ${tableName.replace(/([A-Z])/g, ' $1').trim().toLowerCase()} data`;
     }
 
     const data = await response.json();
-    return data.description || `Table containing ${tableName} data`;
+    return data.description || `Stores ${tableName.replace(/([A-Z])/g, ' $1').trim().toLowerCase()} data`;
   } catch (error) {
     console.error('Failed to generate table description:', error);
-    // Return a simple fallback description if the request fails
-    return `Table containing ${tableName} data`;
+    // Return a more descriptive fallback that at least humanizes the table name
+    return `Stores ${tableName.replace(/([A-Z])/g, ' $1').trim().toLowerCase()} data`;
   }
 }
 
