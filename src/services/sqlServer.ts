@@ -62,13 +62,57 @@ export async function parseDatabase(
     }
 
     const data = await response.json();
+    
+    // Generate examples for each table
+    const tablesWithExamples = await Promise.all(
+      data.tables.map(async (table) => {
+        const example = await generateTableDescription(table.name, table.schema);
+        return {
+          ...table,
+          example
+        };
+      })
+    );
+    
     return {
-      tables: data.tables,
-      promptTemplate: generatePromptTemplate(data.tables),
+      tables: tablesWithExamples,
+      promptTemplate: generatePromptTemplate(tablesWithExamples),
     };
   } catch (error) {
     console.error('Failed to parse database:', error);
     throw error;
+  }
+}
+
+async function generateTableDescription(tableName: string, schema: string[]): Promise<string> {
+  try {
+    // Prepare the prompt for the backend LLM
+    const prompt = `Given a database table named "${tableName}" with the following schema:
+${schema.join(', ')}
+
+In a single sentence of 15-20 words, explain the likely purpose of this table.`;
+
+    // Request the table description from the backend
+    const response = await fetch('http://localhost:3001/api/sql/generate-description', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        prompt
+      }),
+    });
+
+    if (!response.ok) {
+      return `Table containing ${tableName} data`;
+    }
+
+    const data = await response.json();
+    return data.description || `Table containing ${tableName} data`;
+  } catch (error) {
+    console.error('Failed to generate table description:', error);
+    // Return a simple fallback description if the request fails
+    return `Table containing ${tableName} data`;
   }
 }
 
