@@ -1,5 +1,4 @@
-
-import { DatabaseInfo, TableInfo, ConnectionConfig, QueryRefinementAttempt, QueryErrorType, QueryError } from "@/types/database";
+import { DatabaseInfo, TableInfo, ConnectionConfig, QueryRefinementAttempt, QueryErrorType, QueryError, QueryVerificationResult } from "@/types/database";
 
 interface SqlConnectionConfig {
   server: string;
@@ -127,11 +126,7 @@ export async function verifySqlQuery(
   query: string, 
   userQuestion: string, 
   databaseInfo: DatabaseInfo
-): Promise<{
-  isValid: boolean;
-  reason?: string;
-  correctedQuery?: string;
-}> {
+): Promise<QueryVerificationResult> {
   try {
     // Skip verification for empty queries or non-SQL content
     if (!query || isNonSqlResponse(query)) {
