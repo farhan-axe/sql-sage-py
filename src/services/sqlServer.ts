@@ -97,7 +97,13 @@ Create a clear and specific description (15-20 words) that accurately explains:
 
 Focus on being precise and specific rather than generic. For example:
 - Bad: "Table containing Customer data"
-- Good: "Stores customer demographic details and contact information for active purchasers"`;
+- Good: "Stores customer demographic details and contact information for active purchasers"
+
+For dimension tables, include how they relate to fact tables using their keys.
+For fact tables, mention what metrics or transactions they track.
+For example:
+- "DimCurrency table provides currency reference data identified by CurrencyKey for financial transactions"
+- "FactSales table records all sales transactions with revenue metrics and links to dimension tables"`;
 
     // Request the table description from the backend
     const response = await fetch('http://localhost:3001/api/sql/generate-description', {
@@ -111,15 +117,41 @@ Focus on being precise and specific rather than generic. For example:
     });
 
     if (!response.ok) {
-      return `Stores ${tableName.replace(/([A-Z])/g, ' $1').trim().toLowerCase()} data`;
+      // Create a more descriptive fallback based on table name pattern
+      if (tableName.startsWith('Dim')) {
+        return `Reference data for ${tableName.replace('Dim', '').replace(/([A-Z])/g, ' $1').trim().toLowerCase()} identified by ${schema.find(col => col.includes('Key')) || 'primary key'}`;
+      } else if (tableName.startsWith('Fact')) {
+        return `Stores metrics and transactions for ${tableName.replace('Fact', '').replace(/([A-Z])/g, ' $1').trim().toLowerCase()} with dimensional references`;
+      } else {
+        return `Stores ${tableName.replace(/([A-Z])/g, ' $1').trim().toLowerCase()} data with ${schema.length} attributes`;
+      }
     }
 
     const data = await response.json();
-    return data.description || `Stores ${tableName.replace(/([A-Z])/g, ' $1').trim().toLowerCase()} data`;
+    return data.description || generateFallbackDescription(tableName, schema);
   } catch (error) {
     console.error('Failed to generate table description:', error);
-    // Return a more descriptive fallback that at least humanizes the table name
-    return `Stores ${tableName.replace(/([A-Z])/g, ' $1').trim().toLowerCase()} data`;
+    // Return a more intelligent fallback based on naming conventions
+    return generateFallbackDescription(tableName, schema);
+  }
+}
+
+function generateFallbackDescription(tableName: string, schema: string[]): string {
+  // Identify primary or important keys
+  const keyColumns = schema.filter(col => col.includes('Key') || col.includes('ID'));
+  const keyNames = keyColumns.map(col => col.split(' ')[0]).join(', ');
+  
+  // Generate intelligent descriptions based on table name patterns
+  if (tableName.startsWith('Dim')) {
+    const dimension = tableName.replace('Dim', '').replace(/([A-Z])/g, ' $1').trim().toLowerCase();
+    return `Reference table providing ${dimension} attributes identified by ${keyNames || 'primary key'}`;
+  } else if (tableName.startsWith('Fact')) {
+    const subject = tableName.replace('Fact', '').replace(/([A-Z])/g, ' $1').trim().toLowerCase();
+    return `Tracks ${subject} metrics and transactions with dimensional references through ${keyNames || 'foreign keys'}`;
+  } else if (tableName.includes('Bridge') || tableName.includes('Map')) {
+    return `Junction table linking ${keyNames || 'related entities'} in a many-to-many relationship`;
+  } else {
+    return `Stores ${tableName.replace(/([A-Z])/g, ' $1').trim().toLowerCase()} data with ${schema.length} attributes`;
   }
 }
 
