@@ -149,6 +149,7 @@ export async function terminateSession(
       console.warn(`Backend API error: ${response.status} ${response.statusText}`);
       if (response.status === 404) {
         console.warn("The terminate-session endpoint doesn't exist in the backend");
+        console.log("You need to add the terminate-session endpoint to your backend API");
       }
     } catch (apiError) {
       console.warn('Backend API not available:', apiError);

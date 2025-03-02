@@ -19,3 +19,10 @@ export interface DatabaseInfo {
   promptTemplate: string;
   connectionConfig: ConnectionConfig;
 }
+
+export interface QueryRefinementAttempt {
+  attempt: number;
+  query: string;
+  error?: string;
+  response?: string; // Added to store raw response
+}
