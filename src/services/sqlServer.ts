@@ -1,4 +1,3 @@
-
 /**
  * Analyzes a SQL error message to extract useful information
  * for query refinement
@@ -451,4 +450,41 @@ export function isNonSqlResponse(text: string): boolean {
   
   // Default to treating it as a valid query unless it matches specific non-SQL patterns
   return false;
+}
+
+/**
+ * Sends query generation request to the backend LLM service
+ * @param payload The query generation payload including prompt template and examples
+ * @returns Promise with the generated SQL query
+ */
+export async function generateQuery(payload: import('../types/database').QueryGenerationPayload): Promise<string> {
+  try {
+    // Create a properly formatted LLM request that includes both the prompt template and query examples
+    const llmRequest: import('../types/database').LLMQueryGenerationRequest = {
+      question: payload.question,
+      databaseSchema: payload.databaseInfo.promptTemplate,
+      maxRows: payload.maxRows,
+      promptTemplate: payload.promptTemplate,
+      queryExamples: payload.queryExamples
+    };
+
+    const response = await fetch('http://localhost:3001/api/sql/generate-query', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(llmRequest),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.query || '';
+  } catch (error) {
+    console.error('Query generation error:', error);
+    throw error;
+  }
 }

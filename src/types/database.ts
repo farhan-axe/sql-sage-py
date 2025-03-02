@@ -56,3 +56,12 @@ export interface QueryGenerationPayload {
   promptTemplate: string;
   queryExamples: string;
 }
+
+// Add this new interface for the backend LLM request
+export interface LLMQueryGenerationRequest {
+  question: string;
+  databaseSchema: string;
+  maxRows: number;
+  promptTemplate?: string;
+  queryExamples?: string;
+}
