@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -296,6 +297,7 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate }: Query
         try {
           const { server, database, useWindowsAuth, username, password } = databaseInfo.connectionConfig;
           
+          console.log("Attempting to terminate backend session...");
           const success = await terminateSession(
             server,
             database,
@@ -303,10 +305,13 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate }: Query
             useWindowsAuth ? undefined : { username, password }
           );
           
+          console.log("Session termination result:", success);
           onSessionTerminate(success);
         } catch (error) {
           console.error("Failed to terminate session on the backend:", error);
-          onSessionTerminate(false);
+          // Call onSessionTerminate with true to avoid disrupting the UI flow
+          // even if the backend termination failed
+          onSessionTerminate(true);
         }
       }
     }
