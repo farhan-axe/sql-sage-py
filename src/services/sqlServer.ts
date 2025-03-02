@@ -1,3 +1,4 @@
+
 import { DatabaseInfo, TableInfo, ConnectionConfig, QueryRefinementAttempt, QueryErrorType, QueryError } from "@/types/database";
 
 interface SqlConnectionConfig {
@@ -120,7 +121,7 @@ Here are the details of the tables:\n\n`;
  * @param query The query string to check
  * @returns true if the query indicates it's not a valid SQL query
  */
-function isNonSqlResponse(query: string): boolean {
+export function isNonSqlResponse(query: string): boolean {
   // Keywords or phrases that indicate the model couldn't generate a valid SQL query
   const nonSqlIndicators = [
     "cannot answer",
