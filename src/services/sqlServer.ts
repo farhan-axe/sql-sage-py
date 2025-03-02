@@ -285,6 +285,99 @@ export function isNonSqlResponse(text: string): boolean {
   return false;
 }
 
+/**
+ * Process SQL error and generate a refined query using AI
+ * @param query The original SQL query that caused the error
+ * @param errorMessage The error message returned from the database
+ * @param databaseInfo Database schema information for context
+ * @returns A refined SQL query that attempts to fix the error
+ */
+export async function refineQueryWithError(
+  query: string,
+  errorMessage: string,
+  databaseInfo: DatabaseInfo
+): Promise<string> {
+  try {
+    // Send the query, error, and database info to the backend for refinement
+    const response = await fetch('http://localhost:3001/api/sql/refine-query', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({
+        query,
+        errorMessage,
+        databaseInfo
+      }),
+    });
+
+    if (!response.ok) {
+      console.error(`Error response from refine-query endpoint: ${response.status}`);
+      // Return the original query if the refinement fails
+      return query;
+    }
+
+    const data = await response.json();
+    return data.refinedQuery || query;
+  } catch (error) {
+    console.error("Failed to refine query:", error);
+    // Return the original query if an exception occurs
+    return query;
+  }
+}
+
+/**
+ * Analyzes a SQL error message to extract useful information
+ * for query refinement
+ * @param errorMessage The raw error message from the database
+ * @returns Structured information about the error
+ */
+export function analyzeSqlError(errorMessage: string): {
+  errorType: string;
+  problematicEntity?: string;
+  suggestion?: string;
+} {
+  // Default error analysis
+  let result = {
+    errorType: 'unknown',
+    problematicEntity: undefined,
+    suggestion: undefined
+  };
+
+  // Check for common SQL Server error patterns
+  if (errorMessage.includes('multi-part identifier') && errorMessage.includes('could not be bound')) {
+    // Extract the problematic identifier (usually in quotes)
+    const match = errorMessage.match(/multi-part identifier "([^"]+)"/);
+    const identifier = match ? match[1] : undefined;
+    
+    result = {
+      errorType: 'invalid_column_reference',
+      problematicEntity: identifier,
+      suggestion: identifier ? 
+        `Check the table alias or fully qualify the column name ${identifier}` : 
+        'Ensure all column references use the correct table alias'
+    };
+  } else if (errorMessage.includes('Invalid object name')) {
+    // Extract table name
+    const match = errorMessage.match(/Invalid object name '([^']+)'/);
+    const tableName = match ? match[1] : undefined;
+    
+    result = {
+      errorType: 'invalid_table_name',
+      problematicEntity: tableName,
+      suggestion: 'Verify the table name exists in the database'
+    };
+  } else if (errorMessage.includes('syntax error')) {
+    result = {
+      errorType: 'syntax_error',
+      suggestion: 'Check SQL syntax for missing or incorrect keywords, parentheses, or operators'
+    };
+  }
+
+  return result;
+}
+
 export async function terminateSession(
   server: string,
   database: string,
