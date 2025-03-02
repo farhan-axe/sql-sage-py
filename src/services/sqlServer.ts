@@ -210,13 +210,33 @@ export function isNonSqlResponse(text: string): boolean {
   
   const lowerText = text.toLowerCase();
   
+  // Check if it matches common database-related questions 
+  const commonDatabaseQuestions = [
+    'top', 'list', 'find', 'show me', 'provide', 'display', 'get', 
+    'retrieve', 'calculate', 'sum', 'count', 'average', 'report',
+    'customers', 'products', 'orders', 'sales', 'transactions',
+    'revenue', 'profit', 'inventory', 'stock', 'price', 'date',
+    'total', 'history', 'compare', 'analysis', 'trend', 'detail'
+  ];
+  
+  // If the question contains multiple database-related terms, it's likely a valid question
+  const containsDatabaseTerms = commonDatabaseQuestions.filter(term => 
+    lowerText.includes(term)
+  ).length;
+  
+  // If it contains at least 3 database-related terms, it's very likely a valid database question
+  if (containsDatabaseTerms >= 2) {
+    return false;
+  }
+  
+  // Original logic as fallback
   // Check if it contains SQL keywords
   const containsSqlKeywords = [
     'select', 'from', 'where', 'join', 'group by', 
     'order by', 'having', 'insert', 'update', 'delete'
   ].some(keyword => lowerText.includes(keyword));
   
-  if (!containsSqlKeywords) return true;
+  if (containsSqlKeywords) return false;
   
   // Check for common non-SQL response patterns
   const nonSqlPatterns = [
@@ -224,16 +244,23 @@ export function isNonSqlResponse(text: string): boolean {
     'no information', 'not possible', 'sorry', 'apologies'
   ];
   
-  // If it contains both SQL keywords and non-SQL patterns, check further
+  // If it contains non-SQL patterns, check further
   if (nonSqlPatterns.some(pattern => lowerText.includes(pattern))) {
-    // Look for explanatory sentences
-    const sentences = text.split(/[.!?]+/);
-    // If there are multiple sentences and they're mostly explanatory, 
-    // it's likely not a valid SQL query
-    if (sentences.length > 2) {
-      return true;
-    }
+    return true;
   }
   
+  // For short queries that don't match any pattern above but are clearly asking for data
+  if (lowerText.length < 100 && 
+      (lowerText.includes('?') || 
+       lowerText.includes('show') || 
+       lowerText.includes('get') ||
+       lowerText.includes('find') ||
+       lowerText.includes('list') ||
+       lowerText.includes('provide'))) {
+    return false;
+  }
+  
+  // Default to treating it as a valid query unless it matches specific non-SQL patterns
   return false;
 }
+
