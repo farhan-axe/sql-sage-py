@@ -261,17 +261,15 @@ function generateQueryExamples(tables: any[]): string {
     
     if (commonColumns.length > 0) {
       const joinColumn = commonColumns[0];
-      examples += `SELECT a.*, b.*\n`;
+      examples += `SELECT TOP 10 a.*, b.*\n`;
       examples += `FROM ${tableNames[0]} AS a\n`;
-      examples += `JOIN ${tableNames[1]} AS b ON a.${joinColumn} = b.${joinColumn}\n`;
-      examples += `LIMIT 10;\n`;
+      examples += `JOIN ${tableNames[1]} AS b ON a.${joinColumn} = b.${joinColumn};\n`;
     } else {
       // If no common columns found, suggest using an artificial example
       examples += `-- Note: No common columns found, but you could join if there were one\n`;
-      examples += `SELECT a.*, b.*\n`;
+      examples += `SELECT TOP 10 a.*, b.*\n`;
       examples += `FROM ${tableNames[0]} AS a\n`;
-      examples += `JOIN ${tableNames[1]} AS b ON a.CommonColumn = b.CommonColumn\n`;
-      examples += `LIMIT 10;\n`;
+      examples += `JOIN ${tableNames[1]} AS b ON a.CommonColumn = b.CommonColumn;\n`;
     }
     
     examples += '```\n';

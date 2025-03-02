@@ -16,6 +16,14 @@ async def generate_query(request: QueryGenerationRequest):
         clean_schema = prompt_template.replace('### Database Schema:', '').strip()
         formatted_schema = "### Database Schema:\n" + clean_schema if clean_schema else ""
 
+        # Fix any SQL Server syntax issues in the query examples
+        # Replace LIMIT with TOP in any examples
+        if query_examples:
+            query_examples = query_examples.replace("LIMIT", "-- LIMIT (Note: Use TOP instead for SQL Server)")
+            # Add a note about SQL Server syntax if cross-table queries are present
+            if "Cross-table queries" in query_examples:
+                query_examples += "\n\nNote: In SQL Server, use TOP instead of LIMIT, and remember that ORDER BY cannot be used in subqueries without TOP, OFFSET, or FOR XML."
+
         logger.info(f"Database Schema (from prompt_template):\n{formatted_schema}\n\n")
         logger.info(f"Query Examples:\n{query_examples}\n\n")
 
@@ -36,11 +44,12 @@ async def generate_query(request: QueryGenerationRequest):
 12. **Answer the question as straight forward as possible, what has been asked that should be responded, don't think too much.**
 13. **If the question asks for Customer Wise, Product Wise or Category Wise Count, for aggregated function then always use GROUP BY CLAUSE.**
 14. **Do not include ORDER BY clauses in subqueries, common table expressions, derived tables, inline functions, or views unless accompanied by TOP, OFFSET, or FOR XML, to avoid SQL Server errors.**
+15. **Always use SQL Server syntax: use TOP instead of LIMIT for row limitations.**
 
 """
 
         # Build the prompt using a triple-quoted f-string.
-        prompt = f"""You are an expert in SQL. Your task is to generate a valid SQL Server query for the given question
+        prompt = f"""You are an expert in SQL Server. Your task is to generate a valid SQL Server query for the given question
 
         
 Here is the existing database table:
