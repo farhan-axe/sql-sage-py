@@ -17,6 +17,7 @@ export interface ConnectionConfig {
 export interface DatabaseInfo {
   tables: TableInfo[];
   promptTemplate: string;
+  queryExamples: string;
   connectionConfig: ConnectionConfig;
 }
 

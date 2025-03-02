@@ -1,3 +1,4 @@
+
 /**
  * Analyzes a SQL error message to extract useful information
  * for query refinement
@@ -96,7 +97,7 @@ export async function parseDatabase(
   database: string,
   useWindowsAuth: boolean,
   credentials?: { username: string; password: string }
-): Promise<{ tables: any[]; promptTemplate: string }> {
+): Promise<{ tables: any[]; promptTemplate: string; queryExamples: string }> {
   try {
     const requestBody = {
       server,
@@ -123,14 +124,161 @@ export async function parseDatabase(
     // Create a prompt template from table data
     const promptTemplate = generateDetailedPromptTemplate(data.tables || []);
     
+    // Generate SQL query examples based on the schema
+    const queryExamples = generateQueryExamples(data.tables || []);
+    
     return {
       tables: data.tables || [],
       promptTemplate,
+      queryExamples,
     };
   } catch (error) {
     console.error('Parsing error:', error);
     throw error;
   }
+}
+
+/**
+ * Generates example SQL queries based on the database schema
+ * @param tables Array of table information objects
+ * @returns String containing example SQL queries
+ */
+function generateQueryExamples(tables: any[]): string {
+  if (tables.length === 0) return '';
+  
+  let examples = '### SQL Query Examples:\n\n';
+  
+  // Map of table names to their columns
+  const tableColumns: { [tableName: string]: string[] } = {};
+  
+  // Collect table information
+  tables.forEach(table => {
+    if (table.name) {
+      const columns: string[] = [];
+      if (table.columnDetails && table.columnDetails.length > 0) {
+        table.columnDetails.forEach((column: any) => {
+          columns.push(column.name);
+        });
+      } else if (table.schema && table.schema.length > 0) {
+        table.schema.forEach((column: string) => {
+          if (typeof column === 'string') {
+            // Extract just the column name if it's in a format like "column_name type"
+            const parts = column.split(' ');
+            columns.push(parts[0]);
+          }
+        });
+      }
+      tableColumns[table.name] = columns;
+    }
+  });
+  
+  // Generate examples for each table
+  Object.keys(tableColumns).forEach((tableName, index) => {
+    if (index > 0) examples += '\n\n';
+    
+    const columns = tableColumns[tableName];
+    
+    // Example 1: Count all records
+    examples += `1. Count all records in ${tableName}:\n\n`;
+    examples += '```sql\n';
+    examples += `SELECT COUNT(*) AS TotalRecords\nFROM ${tableName};\n`;
+    examples += '```\n\n';
+    
+    if (columns.length > 0) {
+      // Example 2: Select all columns with limit
+      examples += `2. Select all columns from ${tableName} (limited to 10 rows):\n\n`;
+      examples += '```sql\n';
+      examples += `SELECT TOP 10 *\nFROM ${tableName};\n`;
+      examples += '```\n\n';
+      
+      // Example 3: Group by a column if there are enough columns
+      if (columns.length >= 2) {
+        const groupByColumn = columns.find(col => 
+          col.toLowerCase().includes('gender') || 
+          col.toLowerCase().includes('status') || 
+          col.toLowerCase().includes('type') ||
+          col.toLowerCase().includes('city') ||
+          col.toLowerCase().includes('province')
+        ) || columns[1];
+        
+        const countColumn = columns[0];
+        
+        examples += `3. Count records grouped by ${groupByColumn}:\n\n`;
+        examples += '```sql\n';
+        examples += `SELECT ${groupByColumn}, COUNT(*) AS Count\n`;
+        examples += `FROM ${tableName}\n`;
+        examples += `GROUP BY ${groupByColumn}\n`;
+        examples += `ORDER BY Count DESC;\n`;
+        examples += '```\n\n';
+        
+        // Example 4: Advanced query with multiple conditions
+        if (columns.length >= 3) {
+          const filterColumn = columns.find(col => 
+            col.toLowerCase().includes('age') || 
+            col.toLowerCase().includes('date') || 
+            col.toLowerCase().includes('completed')
+          ) || columns[2];
+          
+          examples += `4. Advanced query with filtering and aggregation:\n\n`;
+          examples += '```sql\n';
+          
+          if (filterColumn.toLowerCase().includes('age')) {
+            examples += `SELECT ${groupByColumn}, AVG(${filterColumn}) AS AverageAge, COUNT(*) AS Count\n`;
+            examples += `FROM ${tableName}\n`;
+            examples += `WHERE ${filterColumn} > 18\n`;
+            examples += `GROUP BY ${groupByColumn}\n`;
+            examples += `HAVING COUNT(*) > 1\n`;
+            examples += `ORDER BY Count DESC;\n`;
+          } else if (filterColumn.toLowerCase().includes('date')) {
+            examples += `SELECT ${groupByColumn}, YEAR(${filterColumn}) AS Year, COUNT(*) AS Count\n`;
+            examples += `FROM ${tableName}\n`;
+            examples += `WHERE ${filterColumn} >= '2020-01-01'\n`;
+            examples += `GROUP BY ${groupByColumn}, YEAR(${filterColumn})\n`;
+            examples += `ORDER BY Year, Count DESC;\n`;
+          } else {
+            examples += `SELECT ${groupByColumn}, MAX(${filterColumn}) AS MaxValue, COUNT(*) AS Count\n`;
+            examples += `FROM ${tableName}\n`;
+            examples += `GROUP BY ${groupByColumn}\n`;
+            examples += `ORDER BY MaxValue DESC;\n`;
+          }
+          
+          examples += '```\n';
+        }
+      }
+    }
+  });
+  
+  // Add a cross-table query example if we have multiple tables
+  const tableNames = Object.keys(tableColumns);
+  if (tableNames.length >= 2) {
+    examples += '\n\n### Cross-table queries:\n\n';
+    examples += `1. Join ${tableNames[0]} with ${tableNames[1]} on a common column:\n\n`;
+    examples += '```sql\n';
+    
+    // Find a common column between the tables
+    const commonColumns = tableColumns[tableNames[0]].filter(col => 
+      tableColumns[tableNames[1]].includes(col)
+    );
+    
+    if (commonColumns.length > 0) {
+      const joinColumn = commonColumns[0];
+      examples += `SELECT a.*, b.*\n`;
+      examples += `FROM ${tableNames[0]} AS a\n`;
+      examples += `JOIN ${tableNames[1]} AS b ON a.${joinColumn} = b.${joinColumn}\n`;
+      examples += `LIMIT 10;\n`;
+    } else {
+      // If no common columns found, suggest using an artificial example
+      examples += `-- Note: No common columns found, but you could join if there were one\n`;
+      examples += `SELECT a.*, b.*\n`;
+      examples += `FROM ${tableNames[0]} AS a\n`;
+      examples += `JOIN ${tableNames[1]} AS b ON a.CommonColumn = b.CommonColumn\n`;
+      examples += `LIMIT 10;\n`;
+    }
+    
+    examples += '```\n';
+  }
+  
+  return examples;
 }
 
 /**
