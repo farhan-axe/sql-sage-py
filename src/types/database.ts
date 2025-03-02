@@ -57,11 +57,21 @@ export interface QueryGenerationPayload {
   queryExamples: string;
 }
 
-// Add this new interface for the backend LLM request
+// Backend LLM request interface
 export interface LLMQueryGenerationRequest {
   question: string;
   databaseSchema: string;
   maxRows: number;
   promptTemplate?: string;
   queryExamples?: string;
+}
+
+// API response interfaces
+export interface QueryExecutionResponse {
+  results: any[];
+  refinement_history?: QueryRefinementAttempt[];
+}
+
+export interface QueryGenerationResponse {
+  query: string;
 }
