@@ -5,13 +5,15 @@ import { useToast } from "@/components/ui/use-toast";
 import { DatabaseInfo } from "@/types/database";
 import DataDisplay from "./DataDisplay";
 import { RotateCcw, PlayCircle, XCircle, Clock } from "lucide-react";
+import { terminateSession } from "@/services/sqlServer";
 
 interface QueryInterfaceProps {
   isConnected: boolean;
   databaseInfo: DatabaseInfo | null;
+  onSessionTerminate: (success: boolean) => void;
 }
 
-const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
+const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate }: QueryInterfaceProps) => {
   const { toast } = useToast();
   const [question, setQuestion] = useState("");
   const [generatedQuery, setGeneratedQuery] = useState("");
@@ -273,7 +275,7 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
     }
   };
 
-  const terminateOperation = () => {
+  const terminateOperation = async () => {
     if (controller) {
       controller.abort();
       setController(null);
@@ -289,6 +291,24 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
         title: "Operation terminated",
         description: "The current operation has been terminated",
       });
+      
+      if (databaseInfo && databaseInfo.connectionConfig) {
+        try {
+          const { server, database, useWindowsAuth, username, password } = databaseInfo.connectionConfig;
+          
+          const success = await terminateSession(
+            server,
+            database,
+            useWindowsAuth,
+            useWindowsAuth ? undefined : { username, password }
+          );
+          
+          onSessionTerminate(success);
+        } catch (error) {
+          console.error("Failed to terminate session on the backend:", error);
+          onSessionTerminate(false);
+        }
+      }
     }
   };
 
