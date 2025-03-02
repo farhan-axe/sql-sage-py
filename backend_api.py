@@ -1,6 +1,4 @@
 
-# ... keep existing code (imports, app setup, models, constants, and helper functions)
-
 @app.post("/api/sql/generate")
 async def generate_query(request: QueryGenerationRequest):
     """
@@ -13,6 +11,13 @@ async def generate_query(request: QueryGenerationRequest):
         # Extract prompt template and query examples from the incoming databaseInfo
         prompt_template = request.databaseInfo.get('promptTemplate', '')
         query_examples = request.databaseInfo.get('queryExamples', '')
+
+        # Clean up the database schema format if needed
+        clean_schema = prompt_template.replace('### Database Schema:', '').strip()
+        formatted_schema = "### Database Schema:\n" + clean_schema if clean_schema else ""
+
+        logger.info(f"Database Schema (from prompt_template):\n{formatted_schema}\n\n")
+        logger.info(f"Query Examples:\n{query_examples}\n\n")
 
         # Define the output rules in a separate variable.
         output_rules = """
@@ -39,7 +44,7 @@ async def generate_query(request: QueryGenerationRequest):
 
         
 Here is the existing database table:
-{prompt_template}
+{formatted_schema}
 
 # Use the user-provided query examples if available, otherwise use the defaults
 {query_examples if query_examples else """
@@ -140,5 +145,3 @@ User Question: {request.question} by looking at existing database table
     except Exception as e:
         logger.error(f"❌ Query Generation Error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
-
-# ... keep existing code (remaining API endpoints)
