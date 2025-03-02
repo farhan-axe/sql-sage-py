@@ -47,3 +47,12 @@ export interface QueryVerificationResult {
   reason?: string;
   correctedQuery?: string;
 }
+
+// Interface for query generation request payload 
+export interface QueryGenerationPayload {
+  question: string;
+  databaseInfo: DatabaseInfo;
+  maxRows: number;
+  promptTemplate: string;
+  queryExamples: string;
+}

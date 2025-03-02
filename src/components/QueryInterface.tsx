@@ -170,7 +170,9 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate }: Query
           body: JSON.stringify({
             question,
             databaseInfo,
-            maxRows: 200
+            maxRows: 200,
+            promptTemplate: databaseInfo.promptTemplate,
+            queryExamples: databaseInfo.queryExamples
           }),
         },
         newController
