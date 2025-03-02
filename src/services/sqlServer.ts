@@ -138,58 +138,19 @@ export function isNonSqlResponse(text: string): boolean {
     "[Your Query Here]",
     "[Your Table Here]",
     "✅ Generated SQL Query:",
-    "who is the president",
-    "president of Pakistan",
     "Raw Ollama response:",
     "<think>",
-    "putting it all together",
-    "Prime Minister",
-    "leadership",
-    "political"
+    "putting it all together"
   ];
 
   // Additional check for non-database related questions
   const nonDatabaseQuestions = [
-    "who is", 
-    "what is",
-    "when did",
-    "where is",
-    "why does",
-    "how many people",
-    "tell me about",
-    "history of",
-    "president",
+    "who is the president",
     "prime minister",
     "capital of",
-    "population of",
-    "weather in",
-    "meaning of",
-    "definition of",
-    "explain"
+    "weather in"
   ];
   
-  // Check for profanity and abusive language
-  const profanityAndAbusiveLanguage = [
-    "fuck", "f**k", "f*ck", "fck", "fuk", "fuking", "fucking", 
-    "shit", "sh*t", "s**t", 
-    "bitch", "b*tch", 
-    "ass", "a**", 
-    "damn", "d*mn",
-    "cunt", "c*nt",
-    "dick", "d*ck", "penis",
-    "pussy", "p*ssy",
-    "whore", "wh*re",
-    "bastard", "b*stard",
-    "asshole", "a**hole",
-    "piss", "p*ss",
-    "dog", "b*tch", "slut", "idiot", "stupid", 
-    "dumb", "moron", "retard", "retarded", 
-    "nigger", "n*gger", "n***er",
-    "nazi", "fag", "faggot", "homo", "queer",
-    "kill yourself", "kys", "commit suicide",
-    "sex", "porn", "naked", "nude", "xxx"
-  ];
-
   const textLower = text.toLowerCase();
   
   // Check for non-SQL indicators
@@ -197,16 +158,8 @@ export function isNonSqlResponse(text: string): boolean {
     return true;
   }
   
-  // Check for profanity or abusive language
-  if (profanityAndAbusiveLanguage.some(word => {
-    // Use regex with word boundaries to match whole words or words within other words
-    const regex = new RegExp(`\\b${word}\\b|${word}`, 'i');
-    return regex.test(textLower);
-  })) {
-    return true;
-  }
-  
   // For user questions (not SQL responses), check if they're likely non-database related
+  // Only check for obvious non-database questions to avoid false positives
   if (!textLower.includes("select") && !textLower.includes("from") && !textLower.includes("where")) {
     return nonDatabaseQuestions.some(phrase => textLower.includes(phrase.toLowerCase()));
   }
