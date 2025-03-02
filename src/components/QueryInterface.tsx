@@ -5,6 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { DatabaseInfo } from "@/types/database";
 import DataDisplay from "./DataDisplay";
+import { RotateCcw, PlayCircle, XCircle } from "lucide-react";
 
 interface QueryInterfaceProps {
   isConnected: boolean;
@@ -15,19 +16,17 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
   const { toast } = useToast();
   const [question, setQuestion] = useState("");
   const [generatedQuery, setGeneratedQuery] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [isExecuting, setIsExecuting] = useState(false);
   const [queryResults, setQueryResults] = useState<any[] | null>(null);
+  const [controller, setController] = useState<AbortController | null>(null);
 
-  const fetchWithTimeout = async (url: string, options: RequestInit, timeout = 120000) => {
-    const controller = new AbortController();
-    const id = setTimeout(() => controller.abort(), timeout);
-
+  const fetchWithTimeout = async (url: string, options: RequestInit, abortController: AbortController) => {
     try {
       const response = await fetch(url, {
         ...options,
-        signal: controller.signal
+        signal: abortController.signal
       });
-      clearTimeout(id);
       
       if (!response.ok) {
         const errorData = await response.json();
@@ -36,10 +35,9 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
       
       return response;
     } catch (error) {
-      clearTimeout(id);
       if (error instanceof Error) {
         if (error.name === 'AbortError') {
-          throw new Error('Request timed out');
+          throw new Error('Request timed out or was terminated');
         }
       }
       throw error;
@@ -89,14 +87,17 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
       return;
     }
 
-    setIsLoading(true);
+    setIsGenerating(true);
     setGeneratedQuery(""); // Clear any previous query
     setQueryResults(null); // Clear any previous results
+    
+    const newController = new AbortController();
+    setController(newController);
     
     try {
       console.log("Starting query generation...");
       
-      // First, generate the SQL query using the API
+      // Generate the SQL query using the API
       const generateResponse = await fetchWithTimeout(
         'http://localhost:3001/api/sql/generate',
         {
@@ -108,7 +109,8 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
             question,
             databaseInfo
           }),
-        }
+        },
+        newController
       );
 
       const generatedData = await generateResponse.json();
@@ -120,10 +122,43 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
       }
       
       setGeneratedQuery(cleanedQuery);
+      toast({
+        title: "Query generated successfully",
+      });
+    } catch (error) {
+      console.error("Error during query generation:", error);
+      let errorMessage = "Failed to generate query";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+        console.error('Detailed error:', error);
+      }
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setIsGenerating(false);
+      setController(null);
+    }
+  };
 
-      // Execute the generated query
+  const handleQueryExecution = async () => {
+    if (!generatedQuery || !databaseInfo) {
+      toast({
+        title: "No query to execute",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsExecuting(true);
+    const newController = new AbortController();
+    setController(newController);
+    
+    try {
       console.log("Executing query with config:", {
-        query: cleanedQuery,
+        query: generatedQuery,
         databaseInfo: databaseInfo.connectionConfig
       });
 
@@ -135,10 +170,11 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            query: cleanedQuery,
+            query: generatedQuery,
             databaseInfo: databaseInfo.connectionConfig
           }),
-        }
+        },
+        newController
       );
 
       const { results } = await executeResponse.json();
@@ -149,8 +185,8 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
         title: "Query executed successfully",
       });
     } catch (error) {
-      console.error("Error during query generation/execution:", error);
-      let errorMessage = "Failed to generate or execute query";
+      console.error("Error during query execution:", error);
+      let errorMessage = "Failed to execute query";
       if (error instanceof Error) {
         errorMessage = error.message;
         console.error('Detailed error:', error);
@@ -161,7 +197,21 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
         variant: "destructive",
       });
     } finally {
-      setIsLoading(false);
+      setIsExecuting(false);
+      setController(null);
+    }
+  };
+
+  const terminateOperation = () => {
+    if (controller) {
+      controller.abort();
+      setController(null);
+      setIsGenerating(false);
+      setIsExecuting(false);
+      toast({
+        title: "Operation terminated",
+        description: "The current operation has been terminated",
+      });
     }
   };
 
@@ -188,13 +238,27 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
           placeholder="e.g., Show me the sales from last year"
           className="h-24"
         />
-        <Button 
-          onClick={handleQueryGeneration}
-          disabled={isLoading || !question.trim()}
-          className="w-full"
-        >
-          {isLoading ? "Generating Query..." : "Generate Query"}
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            onClick={handleQueryGeneration}
+            disabled={isGenerating || isExecuting || !question.trim()}
+            className="flex-1"
+            variant={isGenerating ? "secondary" : "default"}
+          >
+            {isGenerating ? "Generating Query..." : "Generate Query"}
+          </Button>
+          
+          {(isGenerating || isExecuting) && (
+            <Button 
+              onClick={terminateOperation}
+              variant="destructive"
+              className="gap-1"
+            >
+              <XCircle size={18} />
+              Terminate
+            </Button>
+          )}
+        </div>
       </div>
 
       {generatedQuery && (
@@ -203,6 +267,14 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
           <pre className="bg-gray-50 p-4 rounded-lg overflow-x-auto">
             <code className="text-sm">{generatedQuery}</code>
           </pre>
+          <Button 
+            onClick={handleQueryExecution}
+            disabled={isExecuting || isGenerating}
+            className="w-full flex items-center justify-center gap-2"
+          >
+            <PlayCircle size={18} />
+            Execute Query
+          </Button>
         </div>
       )}
 
