@@ -53,6 +53,7 @@ export async function parseDatabase(
         server,
         database,
         useWindowsAuth,
+        maxRows: 200, // Always limit results to 200 rows
         ...credentials,
       }),
     });

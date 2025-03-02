@@ -1,11 +1,10 @@
-
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { DatabaseInfo } from "@/types/database";
 import DataDisplay from "./DataDisplay";
-import { RotateCcw, PlayCircle, XCircle } from "lucide-react";
+import { RotateCcw, PlayCircle, XCircle, Clock } from "lucide-react";
 
 interface QueryInterfaceProps {
   isConnected: boolean;
@@ -21,6 +20,41 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
   const [queryResults, setQueryResults] = useState<any[] | null>(null);
   const [controller, setController] = useState<AbortController | null>(null);
   const [sessionTimeout, setSessionTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const startTimeRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (isGenerating || isExecuting) {
+      startTimeRef.current = Date.now();
+      setElapsedTime(0);
+      
+      timerRef.current = setInterval(() => {
+        if (startTimeRef.current) {
+          const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
+          setElapsedTime(elapsed);
+        }
+      }, 1000);
+    } else {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      startTimeRef.current = null;
+    }
+    
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    };
+  }, [isGenerating, isExecuting]);
+
+  const formatTime = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
 
   const fetchWithTimeout = async (url: string, options: RequestInit, abortController: AbortController) => {
     try {
@@ -46,13 +80,11 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
   };
 
   const extractSQLQuery = (text: string): string => {
-    // First, try to extract query from SQL code blocks
     const sqlBlockMatch = text.match(/```sql\s*([\s\S]*?)\s*```/i);
     if (sqlBlockMatch) {
       return sqlBlockMatch[1].trim();
     }
 
-    // If no SQL blocks found, try to extract query starting with SQL keywords
     const sqlKeywords = ['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'WITH'];
     const lines = text.split('\n');
     const queryLines = [];
@@ -61,12 +93,10 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
     for (const line of lines) {
       const upperLine = line.toUpperCase().trim();
       
-      // Start capturing when we find a SQL keyword
       if (sqlKeywords.some(keyword => upperLine.startsWith(keyword))) {
         foundQuery = true;
       }
 
-      // If we're in query mode and line isn't empty or explanatory text
       if (foundQuery && 
           line.trim() !== '' && 
           !line.toLowerCase().includes('here') &&
@@ -95,7 +125,6 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
     const newController = new AbortController();
     setController(newController);
     
-    // Set timeout for 3 minutes (180000 ms)
     const timeout = setTimeout(() => {
       if (controller) {
         toast({
@@ -111,7 +140,6 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
     try {
       console.log("Starting query generation...");
       
-      // Generate the SQL query using the API
       const generateResponse = await fetchWithTimeout(
         'http://localhost:3001/api/sql/generate',
         {
@@ -121,7 +149,8 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
           },
           body: JSON.stringify({
             question,
-            databaseInfo
+            databaseInfo,
+            maxRows: 200
           }),
         },
         newController
@@ -135,7 +164,13 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
         throw new Error('Failed to extract a valid SQL query from the response');
       }
       
-      setGeneratedQuery(cleanedQuery);
+      let finalQuery = cleanedQuery;
+      if (finalQuery.toUpperCase().trim().startsWith('SELECT') && 
+          !finalQuery.toUpperCase().includes('TOP ')) {
+        finalQuery = finalQuery.replace(/SELECT/i, 'SELECT TOP 200');
+      }
+      
+      setGeneratedQuery(finalQuery);
       toast({
         title: "Query generated successfully",
       });
@@ -174,7 +209,6 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
     const newController = new AbortController();
     setController(newController);
     
-    // Set timeout for 3 minutes (180000 ms)
     const timeout = setTimeout(() => {
       if (controller) {
         toast({
@@ -190,7 +224,8 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
     try {
       console.log("Executing query with config:", {
         query: generatedQuery,
-        databaseInfo: databaseInfo.connectionConfig
+        databaseInfo: databaseInfo.connectionConfig,
+        maxRows: 200
       });
 
       const executeResponse = await fetchWithTimeout(
@@ -202,7 +237,8 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
           },
           body: JSON.stringify({
             query: generatedQuery,
-            databaseInfo: databaseInfo.connectionConfig
+            databaseInfo: databaseInfo.connectionConfig,
+            maxRows: 200
           }),
         },
         newController
@@ -297,15 +333,21 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
           </Button>
           
           {(isGenerating || isExecuting) && (
-            <Button 
-              onClick={terminateOperation}
-              variant="destructive"
-              className="gap-1"
-              title="Terminate operation (if taking too long)"
-            >
-              <XCircle size={18} />
-              Terminate
-            </Button>
+            <>
+              <Button 
+                onClick={terminateOperation}
+                variant="destructive"
+                className="gap-1"
+                title="Terminate operation (if taking too long)"
+              >
+                <XCircle size={18} />
+                Terminate
+              </Button>
+              <div className="flex items-center justify-center gap-1 px-3 bg-gray-100 rounded-md border border-gray-200">
+                <Clock size={16} className="text-gray-500" />
+                <span className="font-mono">{formatTime(elapsedTime)}</span>
+              </div>
+            </>
           )}
         </div>
       </div>
@@ -316,30 +358,40 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
           <pre className="bg-gray-50 p-4 rounded-lg overflow-x-auto">
             <code className="text-sm">{generatedQuery}</code>
           </pre>
-          <Button 
-            onClick={handleQueryExecution}
-            disabled={isExecuting || isGenerating}
-            className="w-full flex items-center justify-center gap-2"
-            variant={isExecuting ? "secondary" : "default"}
-          >
-            {isExecuting ? (
-              <>
-                <RotateCcw className="mr-2 h-4 w-4 animate-spin" />
-                Executing Query...
-              </>
-            ) : (
-              <>
-                <PlayCircle size={18} />
-                Execute Query
-              </>
+          <div className="flex gap-2">
+            <Button 
+              onClick={handleQueryExecution}
+              disabled={isExecuting || isGenerating}
+              className="flex-1 items-center justify-center gap-2"
+              variant={isExecuting ? "secondary" : "default"}
+            >
+              {isExecuting ? (
+                <>
+                  <RotateCcw className="mr-2 h-4 w-4 animate-spin" />
+                  Executing Query...
+                </>
+              ) : (
+                <>
+                  <PlayCircle size={18} />
+                  Execute Query
+                </>
+              )}
+            </Button>
+            {isExecuting && (
+              <div className="flex items-center justify-center gap-1 px-3 bg-gray-100 rounded-md border border-gray-200">
+                <Clock size={16} className="text-gray-500" />
+                <span className="font-mono">{formatTime(elapsedTime)}</span>
+              </div>
             )}
-          </Button>
+          </div>
         </div>
       )}
 
       {queryResults && (
         <div className="mt-6">
-          <h3 className="text-sm font-medium text-gray-700 mb-2">Query Results</h3>
+          <h3 className="text-sm font-medium text-gray-700 mb-2">
+            Query Results {queryResults.length > 0 && <span className="text-xs text-gray-500">(Limited to 200 rows)</span>}
+          </h3>
           <DataDisplay data={queryResults} />
         </div>
       )}
