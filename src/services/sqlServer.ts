@@ -1,4 +1,3 @@
-
 /**
  * Analyzes a SQL error message to extract useful information
  * for query refinement
@@ -122,7 +121,7 @@ export async function parseDatabase(
     const data = await response.json();
     
     // Create a prompt template from table data
-    const promptTemplate = generatePromptTemplate(data.tables || []);
+    const promptTemplate = generateDetailedPromptTemplate(data.tables || []);
     
     return {
       tables: data.tables || [],
@@ -135,9 +134,51 @@ export async function parseDatabase(
 }
 
 /**
- * Generates a prompt template from table schema information
+ * Generates a detailed prompt template from table schema information
+ * with column types and constraints
  * @param tables Array of table information objects
  * @returns String containing formatted database schema for prompts
+ */
+function generateDetailedPromptTemplate(tables: any[]): string {
+  let template = '';
+  
+  if (tables.length > 0) {
+    template += '### Database Schema:\n';
+    
+    tables.forEach(table => {
+      template += `        The database table '${table.name}' contains the following columns:\n`;
+      
+      // Extract and format column information with their types and constraints
+      if (table.columnDetails && table.columnDetails.length > 0) {
+        table.columnDetails.forEach((column: any) => {
+          template += `        - ${column.name} (${column.dataType}${column.isNullable ? '' : ', NOT NULL'}): ${column.description || 'No description available'}.\n`;
+        });
+      } else if (table.schema && table.schema.length > 0) {
+        // Fallback to basic schema if detailed column info is not available
+        table.schema.forEach((column: string) => {
+          template += `        - ${column}\n`;
+        });
+      }
+      
+      if (table.primaryKey) {
+        template += `        Primary Key: ${table.primaryKey}\n`;
+      }
+      
+      if (table.example) {
+        template += `        Example data: ${table.example}\n`;
+      }
+      
+      template += '\n';
+    });
+  }
+  
+  return template;
+}
+
+/**
+ * Original simple template generator (kept for backward compatibility)
+ * @param tables Array of table information objects
+ * @returns String containing basic formatted database schema
  */
 function generatePromptTemplate(tables: any[]): string {
   let template = '';
@@ -263,4 +304,3 @@ export function isNonSqlResponse(text: string): boolean {
   // Default to treating it as a valid query unless it matches specific non-SQL patterns
   return false;
 }
-
