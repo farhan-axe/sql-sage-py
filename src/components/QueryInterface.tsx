@@ -122,6 +122,20 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate }: Query
       return;
     }
 
+    // Check if the question is likely not database-related before sending to backend
+    if (isNonSqlResponse(question)) {
+      setQueryError("This question does not appear to be related to database content. Please ask a question about the data in your connected database.");
+      toast({
+        title: "Non-database question detected",
+        description: "Please ask a question about your database content",
+        variant: "destructive",
+      });
+      setGeneratedQuery(""); // Clear any previous query
+      setQueryResults(null); // Clear any previous results
+      setRefinementAttempts([]); // Clear previous refinement attempts
+      return;
+    }
+
     setIsGenerating(true);
     setGeneratedQuery(""); // Clear any previous query
     setQueryResults(null); // Clear any previous results
@@ -169,7 +183,7 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate }: Query
       if (isNonSqlResponse(generatedData.query)) {
         console.log("Detected non-SQL response, displaying as error message");
         // This is an informational message or error, not a SQL query
-        setQueryError(generatedData.query);
+        setQueryError("The database does not contain information to answer this question. Please try a different question about your database content.");
         toast({
           title: "Cannot generate SQL query",
           description: "The database does not contain the requested information",

@@ -1,4 +1,3 @@
-
 import { DatabaseInfo, TableInfo, ConnectionConfig, QueryRefinementAttempt, QueryErrorType, QueryError } from "@/types/database";
 
 interface SqlConnectionConfig {
@@ -118,8 +117,9 @@ Here are the details of the tables:\n\n`;
 
 /**
  * Checks if a query response indicates it's not a valid SQL query
- * @param text The query string to check
- * @returns true if the query indicates it's not a valid SQL query
+ * or if the user question is not related to the database
+ * @param text The query string or user question to check
+ * @returns true if the input indicates it's not database-related
  */
 export function isNonSqlResponse(text: string): boolean {
   if (!text) return true;
@@ -148,8 +148,38 @@ export function isNonSqlResponse(text: string): boolean {
     "political"
   ];
 
+  // Additional check for non-database related questions
+  const nonDatabaseQuestions = [
+    "who is", 
+    "what is",
+    "when did",
+    "where is",
+    "why does",
+    "how many people",
+    "tell me about",
+    "history of",
+    "president",
+    "prime minister",
+    "capital of",
+    "population of",
+    "weather in",
+    "meaning of",
+    "definition of",
+    "explain"
+  ];
+
   const textLower = text.toLowerCase();
-  return nonSqlIndicators.some(indicator => textLower.includes(indicator.toLowerCase()));
+  
+  if (nonSqlIndicators.some(indicator => textLower.includes(indicator.toLowerCase()))) {
+    return true;
+  }
+  
+  // For user questions (not SQL responses), check if they're likely non-database related
+  if (!textLower.includes("select") && !textLower.includes("from") && !textLower.includes("where")) {
+    return nonDatabaseQuestions.some(phrase => textLower.includes(phrase.toLowerCase()));
+  }
+  
+  return false;
 }
 
 export async function terminateSession(
