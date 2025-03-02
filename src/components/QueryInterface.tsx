@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -166,13 +165,14 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate }: Query
       const generatedData = await generateResponse.json();
       console.log("Generated response:", generatedData.query);
       
-      // Check for non-SQL responses or informational messages
+      // Check for non-SQL responses, raw model outputs, or informational messages
       if (isNonSqlResponse(generatedData.query)) {
+        console.log("Detected non-SQL response, displaying as error message");
         // This is an informational message or error, not a SQL query
         setQueryError(generatedData.query);
         toast({
           title: "Cannot generate SQL query",
-          description: "The AI could not generate a SQL query for your question",
+          description: "The database does not contain the requested information",
           variant: "destructive",
         });
         setGeneratedQuery(""); // Clear any previously generated query

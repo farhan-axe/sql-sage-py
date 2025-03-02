@@ -1,3 +1,4 @@
+
 import { DatabaseInfo, TableInfo, ConnectionConfig, QueryRefinementAttempt, QueryErrorType, QueryError } from "@/types/database";
 
 interface SqlConnectionConfig {
@@ -117,7 +118,7 @@ Here are the details of the tables:\n\n`;
 
 /**
  * Checks if a query response indicates it's not a valid SQL query
- * @param query The query string to check
+ * @param text The query string to check
  * @returns true if the query indicates it's not a valid SQL query
  */
 export function isNonSqlResponse(text: string): boolean {
@@ -135,7 +136,16 @@ export function isNonSqlResponse(text: string): boolean {
     "I don't have enough information",
     "the database schema doesn't include",
     "[Your Query Here]",
-    "[Your Table Here]"
+    "[Your Table Here]",
+    "✅ Generated SQL Query:",
+    "who is the president",
+    "president of Pakistan",
+    "Raw Ollama response:",
+    "<think>",
+    "putting it all together",
+    "Prime Minister",
+    "leadership",
+    "political"
   ];
 
   const textLower = text.toLowerCase();
