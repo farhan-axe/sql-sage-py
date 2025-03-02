@@ -164,8 +164,7 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate }: Query
       );
 
       const generatedData = await generateResponse.json();
-      const cleanedQuery = extractSQLQuery(generatedData.query);
-      console.log("Generated query:", cleanedQuery);
+      console.log("Generated response:", generatedData.query);
       
       // Check if the response is not actually a valid SQL query
       if (isNonSqlResponse(generatedData.query)) {
@@ -175,8 +174,12 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate }: Query
           description: "The AI could not generate a SQL query for your question",
           variant: "destructive",
         });
+        setGeneratedQuery(""); // Clear any previously generated query
         return;
       }
+      
+      const cleanedQuery = extractSQLQuery(generatedData.query);
+      console.log("Cleaned query:", cleanedQuery);
       
       if (!cleanedQuery) {
         throw new Error('Failed to extract a valid SQL query from the response');
