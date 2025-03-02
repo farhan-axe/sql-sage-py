@@ -1,4 +1,3 @@
-
 import { DatabaseInfo, TableInfo, ConnectionConfig } from "@/types/database";
 
 interface SqlConnectionConfig {
@@ -168,4 +167,37 @@ Here are the details of the tables:\n\n`;
   });
 
   return template;
+}
+
+export async function terminateSession(
+  server: string,
+  database: string,
+  useWindowsAuth: boolean,
+  credentials?: { username: string; password: string }
+): Promise<boolean> {
+  try {
+    const response = await fetch('http://localhost:3001/api/sql/terminate-session', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({
+        server,
+        database,
+        useWindowsAuth,
+        ...credentials,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to terminate session');
+    }
+
+    const data = await response.json();
+    return data.success || false;
+  } catch (error) {
+    console.error('Failed to terminate session:', error);
+    throw error;
+  }
 }
