@@ -39,3 +39,10 @@ export interface QueryError {
   message: string;
   rawResponse?: string;
 }
+
+// New interface for SQL query verification results
+export interface QueryVerificationResult {
+  isValid: boolean;
+  reason?: string;
+  correctedQuery?: string;
+}

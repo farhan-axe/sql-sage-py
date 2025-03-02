@@ -1,3 +1,4 @@
+
 import { DatabaseInfo, TableInfo, ConnectionConfig, QueryRefinementAttempt, QueryErrorType, QueryError } from "@/types/database";
 
 interface SqlConnectionConfig {
@@ -113,6 +114,128 @@ Here are the details of the tables:\n\n`;
   });
 
   return template;
+}
+
+/**
+ * Verifies if the generated SQL query matches the user's question intent
+ * @param query The SQL query to verify
+ * @param userQuestion The original user question
+ * @param databaseInfo Database schema information for context
+ * @returns An object with verification result and possibly corrected query
+ */
+export async function verifySqlQuery(
+  query: string, 
+  userQuestion: string, 
+  databaseInfo: DatabaseInfo
+): Promise<{
+  isValid: boolean;
+  reason?: string;
+  correctedQuery?: string;
+}> {
+  try {
+    // Skip verification for empty queries or non-SQL content
+    if (!query || isNonSqlResponse(query)) {
+      return { isValid: false, reason: "Generated content is not a valid SQL query" };
+    }
+
+    // Basic validation - check if it has basic SQL structure
+    if (!query.toLowerCase().includes('select') || !query.toLowerCase().includes('from')) {
+      return { isValid: false, reason: "Missing basic SQL SELECT...FROM structure" };
+    }
+
+    // Check if query references tables that exist in the database
+    const tableNames = databaseInfo.tables.map(t => t.name.toLowerCase());
+    const queryTablesReferenced = extractTablesFromQuery(query);
+    
+    const invalidTables = queryTablesReferenced.filter(
+      table => !tableNames.includes(table.toLowerCase())
+    );
+    
+    if (invalidTables.length > 0) {
+      return { 
+        isValid: false, 
+        reason: `Query references non-existent tables: ${invalidTables.join(', ')}` 
+      };
+    }
+
+    // Check if query seems to address the user's question by comparing keywords
+    const userQuestionKeywords = extractKeywords(userQuestion);
+    const queryKeywords = extractKeywords(query);
+    
+    // Calculate what percentage of user question keywords appear in the query
+    const matchedKeywords = userQuestionKeywords.filter(
+      keyword => queryKeywords.some(qKeyword => qKeyword.includes(keyword) || keyword.includes(qKeyword))
+    );
+    
+    const keywordMatchPercentage = matchedKeywords.length / userQuestionKeywords.length;
+    
+    // If less than 30% of keywords match, the query might not address the question
+    if (keywordMatchPercentage < 0.3 && userQuestionKeywords.length > 2) {
+      return { 
+        isValid: false, 
+        reason: "Query may not address the user's question (low keyword match)" 
+      };
+    }
+
+    // If we've passed all checks, the query is likely valid
+    return { isValid: true };
+  } catch (error) {
+    console.error("Error in query verification:", error);
+    // Default to accepting the query if verification fails
+    return { isValid: true, reason: "Verification error, accepting query by default" };
+  }
+}
+
+/**
+ * Extracts table names referenced in a SQL query
+ */
+function extractTablesFromQuery(query: string): string[] {
+  // Basic extraction of table names that follow "FROM" or "JOIN"
+  const tables: string[] = [];
+  const lowerQuery = query.toLowerCase();
+  
+  // Extract tables after FROM
+  const fromMatches = lowerQuery.match(/from\s+([a-z0-9_\[\]\.]+)/gi);
+  if (fromMatches) {
+    fromMatches.forEach(match => {
+      const tableName = match.replace(/from\s+/i, '').trim();
+      tables.push(tableName);
+    });
+  }
+  
+  // Extract tables after JOIN
+  const joinMatches = lowerQuery.match(/join\s+([a-z0-9_\[\]\.]+)/gi);
+  if (joinMatches) {
+    joinMatches.forEach(match => {
+      const tableName = match.replace(/join\s+/i, '').trim();
+      tables.push(tableName);
+    });
+  }
+  
+  return tables.map(table => table.replace(/[\[\]]/g, '')); // Remove square brackets if present
+}
+
+/**
+ * Extracts meaningful keywords from text for comparison
+ */
+function extractKeywords(text: string): string[] {
+  // Convert to lowercase and remove special characters
+  const normalized = text.toLowerCase().replace(/[^\w\s]/g, ' ');
+  
+  // Split into words
+  const words = normalized.split(/\s+/).filter(word => word.length > 2);
+  
+  // Filter out common SQL keywords and stopwords
+  const stopwords = [
+    'select', 'from', 'where', 'and', 'or', 'the', 'is', 'in', 'on', 'at', 'by', 
+    'for', 'with', 'about', 'against', 'between', 'into', 'through', 'during', 
+    'before', 'after', 'above', 'below', 'to', 'from', 'up', 'down', 'a', 'an', 
+    'as', 'table', 'column', 'row', 'value', 'data', 'query', 'result', 'order', 
+    'group', 'having', 'limit', 'offset', 'join', 'left', 'right', 'inner', 'outer',
+    'show', 'tell', 'give', 'find', 'get'
+  ];
+  
+  return words.filter(word => !stopwords.includes(word));
 }
 
 /**
