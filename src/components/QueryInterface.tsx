@@ -20,6 +20,7 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
   const [isExecuting, setIsExecuting] = useState(false);
   const [queryResults, setQueryResults] = useState<any[] | null>(null);
   const [controller, setController] = useState<AbortController | null>(null);
+  const [sessionTimeout, setSessionTimeout] = useState<NodeJS.Timeout | null>(null);
 
   const fetchWithTimeout = async (url: string, options: RequestInit, abortController: AbortController) => {
     try {
@@ -94,6 +95,19 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
     const newController = new AbortController();
     setController(newController);
     
+    // Set timeout for 3 minutes (180000 ms)
+    const timeout = setTimeout(() => {
+      if (controller) {
+        toast({
+          title: "Operation taking too long",
+          description: "The query generation is taking longer than 3 minutes. Consider terminating it.",
+          variant: "destructive",
+        });
+      }
+    }, 180000);
+    
+    setSessionTimeout(timeout);
+    
     try {
       console.log("Starting query generation...");
       
@@ -140,6 +154,10 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
     } finally {
       setIsGenerating(false);
       setController(null);
+      if (sessionTimeout) {
+        clearTimeout(sessionTimeout);
+        setSessionTimeout(null);
+      }
     }
   };
 
@@ -155,6 +173,19 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
     setIsExecuting(true);
     const newController = new AbortController();
     setController(newController);
+    
+    // Set timeout for 3 minutes (180000 ms)
+    const timeout = setTimeout(() => {
+      if (controller) {
+        toast({
+          title: "Operation taking too long",
+          description: "The query execution is taking longer than 3 minutes. Consider terminating it.",
+          variant: "destructive",
+        });
+      }
+    }, 180000);
+    
+    setSessionTimeout(timeout);
     
     try {
       console.log("Executing query with config:", {
@@ -199,6 +230,10 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
     } finally {
       setIsExecuting(false);
       setController(null);
+      if (sessionTimeout) {
+        clearTimeout(sessionTimeout);
+        setSessionTimeout(null);
+      }
     }
   };
 
@@ -208,6 +243,12 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
       setController(null);
       setIsGenerating(false);
       setIsExecuting(false);
+      
+      if (sessionTimeout) {
+        clearTimeout(sessionTimeout);
+        setSessionTimeout(null);
+      }
+      
       toast({
         title: "Operation terminated",
         description: "The current operation has been terminated",
@@ -245,7 +286,14 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
             className="flex-1"
             variant={isGenerating ? "secondary" : "default"}
           >
-            {isGenerating ? "Generating Query..." : "Generate Query"}
+            {isGenerating ? (
+              <>
+                <RotateCcw className="mr-2 h-4 w-4 animate-spin" />
+                Generating Query...
+              </>
+            ) : (
+              "Generate Query"
+            )}
           </Button>
           
           {(isGenerating || isExecuting) && (
@@ -253,6 +301,7 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
               onClick={terminateOperation}
               variant="destructive"
               className="gap-1"
+              title="Terminate operation (if taking too long)"
             >
               <XCircle size={18} />
               Terminate
@@ -271,9 +320,19 @@ const QueryInterface = ({ isConnected, databaseInfo }: QueryInterfaceProps) => {
             onClick={handleQueryExecution}
             disabled={isExecuting || isGenerating}
             className="w-full flex items-center justify-center gap-2"
+            variant={isExecuting ? "secondary" : "default"}
           >
-            <PlayCircle size={18} />
-            Execute Query
+            {isExecuting ? (
+              <>
+                <RotateCcw className="mr-2 h-4 w-4 animate-spin" />
+                Executing Query...
+              </>
+            ) : (
+              <>
+                <PlayCircle size={18} />
+                Execute Query
+              </>
+            )}
           </Button>
         </div>
       )}
