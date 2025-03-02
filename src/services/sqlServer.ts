@@ -141,11 +141,15 @@ export async function terminateSession(
 
       if (response.ok) {
         const data = await response.json();
+        console.log("Session terminated successfully via API");
         return data.success || false;
       }
       
       // If the endpoint is not found (404) or any other error, we'll handle it in the catch block
       console.warn(`Backend API error: ${response.status} ${response.statusText}`);
+      if (response.status === 404) {
+        console.warn("The terminate-session endpoint doesn't exist in the backend");
+      }
     } catch (apiError) {
       console.warn('Backend API not available:', apiError);
       // Continue to the fallback implementation
