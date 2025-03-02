@@ -1,5 +1,4 @@
-
-import { DatabaseInfo, TableInfo, ConnectionConfig } from "@/types/database";
+import { DatabaseInfo, TableInfo, ConnectionConfig, QueryRefinementAttempt, QueryErrorType, QueryError } from "@/types/database";
 
 interface SqlConnectionConfig {
   server: string;
@@ -114,6 +113,39 @@ Here are the details of the tables:\n\n`;
   });
 
   return template;
+}
+
+/**
+ * Checks if a query response indicates it's not a valid SQL query
+ * @param query The query string to check
+ * @returns true if the query indicates it's not a valid SQL query
+ */
+function isNonSqlResponse(query: string): boolean {
+  // Keywords or phrases that indicate the model couldn't generate a valid SQL query
+  const nonSqlIndicators = [
+    "cannot answer",
+    "not possible to answer",
+    "does not contain",
+    "no tables related",
+    "unable to",
+    "I don't have",
+    "doesn't have data",
+    "doesn't contain",
+    "no information about",
+    "no data available",
+    "outside the provided",
+    "not in the database",
+    "not available in",
+    "-- The question asks for information outside"
+  ];
+  
+  // Convert to lowercase for case-insensitive matching
+  const lowerQuery = query.toLowerCase();
+  
+  // Check if any of the indicators are present in the query
+  return nonSqlIndicators.some(indicator => 
+    lowerQuery.includes(indicator.toLowerCase())
+  );
 }
 
 export async function terminateSession(

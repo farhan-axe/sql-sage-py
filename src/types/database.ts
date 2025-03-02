@@ -26,3 +26,16 @@ export interface QueryRefinementAttempt {
   error?: string;
   response?: string; // Added to store raw response
 }
+
+// Error types for handling non-SQL responses
+export enum QueryErrorType {
+  NON_SQL_RESPONSE = "NON_SQL_RESPONSE",
+  EXECUTION_ERROR = "EXECUTION_ERROR",
+  CONNECTION_ERROR = "CONNECTION_ERROR"
+}
+
+export interface QueryError {
+  type: QueryErrorType;
+  message: string;
+  rawResponse?: string;
+}

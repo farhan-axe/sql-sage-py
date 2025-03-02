@@ -3,10 +3,10 @@ import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
-import { DatabaseInfo } from "@/types/database";
+import { DatabaseInfo, QueryRefinementAttempt, QueryErrorType } from "@/types/database";
 import DataDisplay from "./DataDisplay";
 import { RotateCcw, PlayCircle, XCircle, Clock, AlertCircle } from "lucide-react";
-import { terminateSession } from "@/services/sqlServer";
+import { terminateSession, isNonSqlResponse } from "@/services/sqlServer";
 
 interface QueryInterfaceProps {
   isConnected: boolean;
@@ -24,7 +24,8 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate }: Query
   const [controller, setController] = useState<AbortController | null>(null);
   const [sessionTimeout, setSessionTimeout] = useState<NodeJS.Timeout | null>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
-  const [refinementAttempts, setRefinementAttempts] = useState<{attempt: number, query: string, error?: string}[]>([]);
+  const [refinementAttempts, setRefinementAttempts] = useState<QueryRefinementAttempt[]>([]);
+  const [queryError, setQueryError] = useState<string | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef<number | null>(null);
 
@@ -126,6 +127,7 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate }: Query
     setGeneratedQuery(""); // Clear any previous query
     setQueryResults(null); // Clear any previous results
     setRefinementAttempts([]); // Clear previous refinement attempts
+    setQueryError(null); // Clear any previous errors
     
     const newController = new AbortController();
     setController(newController);
@@ -164,6 +166,17 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate }: Query
       const generatedData = await generateResponse.json();
       const cleanedQuery = extractSQLQuery(generatedData.query);
       console.log("Generated query:", cleanedQuery);
+      
+      // Check if the response is not actually a valid SQL query
+      if (isNonSqlResponse(generatedData.query)) {
+        setQueryError(generatedData.query);
+        toast({
+          title: "Cannot generate SQL query",
+          description: "The AI could not generate a SQL query for your question",
+          variant: "destructive",
+        });
+        return;
+      }
       
       if (!cleanedQuery) {
         throw new Error('Failed to extract a valid SQL query from the response');
@@ -414,7 +427,19 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate }: Query
         </div>
       </div>
 
-      {generatedQuery && (
+      {queryError && (
+        <div className="space-y-2">
+          <h3 className="text-sm font-medium text-red-700 flex items-center gap-2">
+            <AlertCircle size={16} className="text-red-600" />
+            Unable to Generate SQL Query
+          </h3>
+          <div className="bg-red-50 p-4 rounded-lg border border-red-200">
+            <p className="text-sm text-red-800">{queryError}</p>
+          </div>
+        </div>
+      )}
+
+      {generatedQuery && !queryError && (
         <div className="space-y-2">
           <h3 className="text-sm font-medium text-gray-700">Generated SQL Query</h3>
           <pre className="bg-gray-50 p-4 rounded-lg overflow-x-auto">
