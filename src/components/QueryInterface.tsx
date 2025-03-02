@@ -5,7 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { DatabaseInfo } from "@/types/database";
 import DataDisplay from "./DataDisplay";
-import { RotateCcw, PlayCircle, XCircle, Clock } from "lucide-react";
+import { RotateCcw, PlayCircle, XCircle, Clock, AlertCircle } from "lucide-react";
 import { terminateSession } from "@/services/sqlServer";
 
 interface QueryInterfaceProps {
@@ -24,6 +24,7 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate }: Query
   const [controller, setController] = useState<AbortController | null>(null);
   const [sessionTimeout, setSessionTimeout] = useState<NodeJS.Timeout | null>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
+  const [refinementAttempts, setRefinementAttempts] = useState<{attempt: number, query: string, error?: string}[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef<number | null>(null);
 
@@ -124,6 +125,7 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate }: Query
     setIsGenerating(true);
     setGeneratedQuery(""); // Clear any previous query
     setQueryResults(null); // Clear any previous results
+    setRefinementAttempts([]); // Clear previous refinement attempts
     
     const newController = new AbortController();
     setController(newController);
@@ -172,6 +174,12 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate }: Query
           !finalQuery.toUpperCase().includes('TOP ')) {
         finalQuery = finalQuery.replace(/SELECT/i, 'SELECT TOP 200');
       }
+      
+      // Add this as the first attempt
+      setRefinementAttempts([{
+        attempt: 1,
+        query: finalQuery
+      }]);
       
       setGeneratedQuery(finalQuery);
       toast({
@@ -247,13 +255,42 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate }: Query
         newController
       );
 
-      const { results } = await executeResponse.json();
-      console.log("Query results:", results);
-      setQueryResults(results);
+      const responseData = await executeResponse.json();
       
-      toast({
-        title: "Query executed successfully",
-      });
+      // Check if there are refined queries in the response
+      if (responseData.refinements && responseData.refinements.length > 0) {
+        // Update the refinement attempts with the new data
+        const updatedAttempts = [...refinementAttempts];
+        
+        responseData.refinements.forEach((refinement: any, index: number) => {
+          updatedAttempts.push({
+            attempt: index + 2, // +2 because attempt 1 is the original query
+            query: refinement.query,
+            error: refinement.error
+          });
+        });
+        
+        setRefinementAttempts(updatedAttempts);
+        
+        // If there was a successful refinement, update the generated query
+        if (responseData.refinements.length > 0 && responseData.results) {
+          const lastRefinement = responseData.refinements[responseData.refinements.length - 1];
+          setGeneratedQuery(lastRefinement.query);
+        }
+      }
+      
+      // Set the results if available
+      if (responseData.results) {
+        console.log("Query results:", responseData.results);
+        setQueryResults(responseData.results);
+        
+        toast({
+          title: "Query executed successfully",
+          description: responseData.refinements && responseData.refinements.length > 0 
+            ? `Required ${responseData.refinements.length} refinement attempts` 
+            : undefined
+        });
+      }
     } catch (error) {
       console.error("Error during query execution:", error);
       let errorMessage = "Failed to execute query";
@@ -408,6 +445,40 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate }: Query
                 <span className="font-mono">{formatTime(elapsedTime)}</span>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {refinementAttempts.length > 1 && (
+        <div className="mt-4 space-y-4">
+          <h3 className="text-sm font-medium text-gray-700 flex items-center gap-2">
+            <AlertCircle size={16} className="text-amber-500" />
+            Query Refinement History
+          </h3>
+          
+          <div className="space-y-4">
+            {refinementAttempts.map((attempt, index) => (
+              <div key={index} className="border rounded-md p-4 bg-gray-50">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="font-medium text-sm">Attempt #{attempt.attempt}</span>
+                  {attempt.error && (
+                    <span className="text-xs text-red-600 bg-red-50 px-2 py-1 rounded-full">
+                      Failed
+                    </span>
+                  )}
+                </div>
+                
+                <pre className="bg-white p-3 rounded border text-sm overflow-x-auto">
+                  <code>{attempt.query}</code>
+                </pre>
+                
+                {attempt.error && (
+                  <div className="mt-2 text-xs text-red-600 bg-red-50 p-2 rounded">
+                    <strong>Error:</strong> {attempt.error}
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         </div>
       )}
