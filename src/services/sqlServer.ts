@@ -167,10 +167,42 @@ export function isNonSqlResponse(text: string): boolean {
     "definition of",
     "explain"
   ];
+  
+  // Check for profanity and abusive language
+  const profanityAndAbusiveLanguage = [
+    "fuck", "f**k", "f*ck", "fck", "fuk", "fuking", "fucking", 
+    "shit", "sh*t", "s**t", 
+    "bitch", "b*tch", 
+    "ass", "a**", 
+    "damn", "d*mn",
+    "cunt", "c*nt",
+    "dick", "d*ck", "penis",
+    "pussy", "p*ssy",
+    "whore", "wh*re",
+    "bastard", "b*stard",
+    "asshole", "a**hole",
+    "piss", "p*ss",
+    "dog", "b*tch", "slut", "idiot", "stupid", 
+    "dumb", "moron", "retard", "retarded", 
+    "nigger", "n*gger", "n***er",
+    "nazi", "fag", "faggot", "homo", "queer",
+    "kill yourself", "kys", "commit suicide",
+    "sex", "porn", "naked", "nude", "xxx"
+  ];
 
   const textLower = text.toLowerCase();
   
+  // Check for non-SQL indicators
   if (nonSqlIndicators.some(indicator => textLower.includes(indicator.toLowerCase()))) {
+    return true;
+  }
+  
+  // Check for profanity or abusive language
+  if (profanityAndAbusiveLanguage.some(word => {
+    // Use regex with word boundaries to match whole words or words within other words
+    const regex = new RegExp(`\\b${word}\\b|${word}`, 'i');
+    return regex.test(textLower);
+  })) {
     return true;
   }
   
