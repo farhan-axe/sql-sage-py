@@ -166,8 +166,9 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate }: Query
       const generatedData = await generateResponse.json();
       console.log("Generated response:", generatedData.query);
       
-      // Check if the response is not actually a valid SQL query
+      // Check for non-SQL responses or informational messages
       if (isNonSqlResponse(generatedData.query)) {
+        // This is an informational message or error, not a SQL query
         setQueryError(generatedData.query);
         toast({
           title: "Cannot generate SQL query",
@@ -178,6 +179,7 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate }: Query
         return;
       }
       
+      // If we get here, we should have a valid SQL query to extract
       const cleanedQuery = extractSQLQuery(generatedData.query);
       console.log("Cleaned query:", cleanedQuery);
       

@@ -1,4 +1,3 @@
-
 import { DatabaseInfo, TableInfo, ConnectionConfig, QueryRefinementAttempt, QueryErrorType, QueryError } from "@/types/database";
 
 interface SqlConnectionConfig {
@@ -121,32 +120,26 @@ Here are the details of the tables:\n\n`;
  * @param query The query string to check
  * @returns true if the query indicates it's not a valid SQL query
  */
-export function isNonSqlResponse(query: string): boolean {
-  // Keywords or phrases that indicate the model couldn't generate a valid SQL query
+export function isNonSqlResponse(text: string): boolean {
+  if (!text) return true;
+
+  // Check for phrases that indicate the response is not a SQL query
   const nonSqlIndicators = [
-    "cannot answer",
+    "database does not contain",
+    "no tables related to",
+    "cannot answer this question",
     "not possible to answer",
-    "does not contain",
-    "no tables related",
-    "unable to",
-    "I don't have",
-    "doesn't have data",
-    "doesn't contain",
-    "no information about",
-    "no data available",
-    "outside the provided",
-    "not in the database",
-    "not available in",
-    "-- The question asks for information outside"
+    "doesn't have information",
+    "doesn't contain information",
+    "I don't have access to",
+    "I don't have enough information",
+    "the database schema doesn't include",
+    "[Your Query Here]",
+    "[Your Table Here]"
   ];
-  
-  // Convert to lowercase for case-insensitive matching
-  const lowerQuery = query.toLowerCase();
-  
-  // Check if any of the indicators are present in the query
-  return nonSqlIndicators.some(indicator => 
-    lowerQuery.includes(indicator.toLowerCase())
-  );
+
+  const textLower = text.toLowerCase();
+  return nonSqlIndicators.some(indicator => textLower.includes(indicator.toLowerCase()));
 }
 
 export async function terminateSession(
