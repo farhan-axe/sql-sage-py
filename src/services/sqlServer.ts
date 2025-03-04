@@ -7,7 +7,7 @@
 function generateQueryExamples(tables: any[]): string {
   if (tables.length === 0) return '';
   
-  let examples = '### SQL Query Examples:\n\n';
+  let examples = '';
   
   // Map of table names to their columns
   const tableColumns: { [tableName: string]: string[] } = {};
@@ -106,3 +106,140 @@ function generateQueryExamples(tables: any[]): string {
   
   return examples;
 }
+
+/**
+ * Connects to a SQL Server instance and retrieves available databases
+ * @param config Connection configuration
+ * @returns Promise that resolves to array of database names
+ */
+export const connectToServer = async (config: { 
+  server: string; 
+  useWindowsAuth: boolean; 
+  username?: string; 
+  password?: string; 
+}): Promise<string[]> => {
+  try {
+    const response = await fetch('/api/sql/connect', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(config),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || 'Failed to connect to the server');
+    }
+    
+    const data = await response.json();
+    return data.databases;
+  } catch (error) {
+    console.error('Error connecting to server:', error);
+    throw error;
+  }
+};
+
+/**
+ * Parses database schema and generates query examples
+ * @param server Server name
+ * @param database Database name
+ * @param useWindowsAuth Whether to use Windows Authentication
+ * @param sqlAuth SQL Server Authentication credentials (optional)
+ * @returns Promise that resolves to database information
+ */
+export const parseDatabase = async (
+  server: string,
+  database: string,
+  useWindowsAuth: boolean,
+  sqlAuth?: { username: string; password: string }
+): Promise<{
+  schema: any[];
+  promptTemplate: string;
+  queryExamples: string;
+}> => {
+  try {
+    const response = await fetch('/api/sql/parse', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        server,
+        database,
+        useWindowsAuth,
+        ...(sqlAuth && { username: sqlAuth.username, password: sqlAuth.password }),
+      }),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || 'Failed to parse database schema');
+    }
+    
+    const data = await response.json();
+    // Generate query examples
+    const queryExamples = generateQueryExamples(data.schema);
+    
+    return {
+      schema: data.schema,
+      promptTemplate: data.promptTemplate,
+      queryExamples
+    };
+  } catch (error) {
+    console.error('Error parsing database:', error);
+    throw error;
+  }
+};
+
+/**
+ * Terminates the current database session
+ * @returns Promise that resolves to success status
+ */
+export const terminateSession = async (): Promise<boolean> => {
+  try {
+    const response = await fetch('/api/sql/terminate', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    if (!response.ok) {
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Error terminating session:', error);
+    return false;
+  }
+};
+
+/**
+ * Checks if a response contains non-SQL content
+ * @param text Response text to check
+ * @returns Boolean indicating whether the response is non-SQL
+ */
+export const isNonSqlResponse = (text: string): boolean => {
+  // Check if the response contains specific indicators of non-SQL content
+  const nonSqlIndicators = [
+    "I'm sorry",
+    "I apologize",
+    "I can't",
+    "cannot",
+    "As an AI",
+    "not authorized",
+    "not allowed",
+    "unable to",
+    "don't have access",
+    "above my capabilities"
+  ];
+  
+  return nonSqlIndicators.some(indicator => 
+    text.toLowerCase().includes(indicator.toLowerCase())
+  );
+};
+
+// Export the function for external use
+export { generateQueryExamples };
