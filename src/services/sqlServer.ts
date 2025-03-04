@@ -65,7 +65,7 @@ function generateQueryExamples(tables: any[]): string {
           col.toLowerCase().includes('province')
         ) || columns[1];
         
-        examples += `3. Count records by ${groupByColumn} with grouping:\n\n`;
+        examples += `3. Count records grouped by ${groupByColumn}:\n\n`;
         examples += '```sql\n';
         examples += `SELECT ${groupByColumn}, COUNT(*) AS Count\n`;
         examples += `FROM ${tableName}\n`;
@@ -91,7 +91,12 @@ export const connectToServer = async (config: {
   password?: string; 
 }): Promise<string[]> => {
   try {
-    console.log("Connecting to server with config:", config);
+    console.log("Connecting to server with config:", JSON.stringify({
+      server: config.server,
+      useWindowsAuth: config.useWindowsAuth,
+      username: config.username ? '(provided)' : '(not provided)',
+      // Don't log the password for security reasons
+    }));
     
     // Check if we're running in development or if the API is accessible
     const apiUrl = '/api/sql/connect';
@@ -112,13 +117,13 @@ export const connectToServer = async (config: {
       
       // Check if the error response contains HTML (common for 404, 500, etc.)
       if (errorText.trim().startsWith('<!DOCTYPE') || errorText.trim().startsWith('<html')) {
-        throw new Error(`Server returned HTML instead of JSON. Status: ${response.status}. This usually means the API endpoint doesn't exist or the server is not running correctly.`);
+        throw new Error(`Server returned HTML instead of JSON. Status: ${response.status}. This usually indicates that the API server is not running or the endpoint doesn't exist. Make sure your backend API is running at ${apiUrl}.`);
       }
       
       let errorDetail;
       try {
         const errorData = JSON.parse(errorText);
-        errorDetail = errorData.detail || 'Failed to connect to the server';
+        errorDetail = errorData.detail || errorData.message || 'Failed to connect to the server';
       } catch (e) {
         errorDetail = 'Failed to connect to the server: ' + errorText;
       }
@@ -127,7 +132,7 @@ export const connectToServer = async (config: {
     }
     
     const responseText = await response.text();
-    console.log("Response text:", responseText);
+    console.log("Response text length:", responseText.length);
     
     if (!responseText.trim()) {
       throw new Error('Empty response from server');
@@ -142,7 +147,7 @@ export const connectToServer = async (config: {
       if (responseText.trim().startsWith('<!DOCTYPE') || responseText.trim().startsWith('<html')) {
         throw new Error(`Server returned HTML instead of JSON. Please check if the API server is running correctly and configured to return JSON responses.`);
       }
-      throw new Error(`Failed to parse server response as JSON. The server might not be returning valid JSON data.`);
+      throw new Error(`Failed to parse server response as JSON. The server might not be returning valid JSON data. Response starts with: ${responseText.substring(0, 100)}...`);
     }
   } catch (error) {
     console.error('Error connecting to server:', error);
@@ -171,6 +176,8 @@ export const parseDatabase = async (
   tables: any[]; // Adding this to match the DatabaseInfo interface
 }> => {
   try {
+    console.log(`Parsing database schema for ${database} on ${server}`);
+    
     const response = await fetch('/api/sql/parse', {
       method: 'POST',
       headers: {
@@ -186,24 +193,26 @@ export const parseDatabase = async (
     
     if (!response.ok) {
       const errorText = await response.text();
+      console.error("Parse database error response:", errorText.substring(0, 200));
       
       // Check if the error response contains HTML
       if (errorText.trim().startsWith('<!DOCTYPE') || errorText.trim().startsWith('<html')) {
-        throw new Error(`Server returned HTML instead of JSON. Status: ${response.status}. This usually means the backend API is not configured correctly.`);
+        throw new Error(`Server returned HTML instead of JSON. Status: ${response.status}. This usually indicates that the API server is not running or the endpoint doesn't exist. Make sure your backend API is running at /api/sql/parse.`);
       }
       
       let errorDetail;
       try {
         const errorData = JSON.parse(errorText);
-        errorDetail = errorData.detail || 'Failed to parse database schema';
+        errorDetail = errorData.detail || errorData.message || 'Failed to parse database schema';
       } catch (e) {
-        errorDetail = 'Failed to parse database: ' + errorText;
+        errorDetail = 'Failed to parse database: ' + errorText.substring(0, 200);
       }
       
       throw new Error(errorDetail);
     }
     
     const responseText = await response.text();
+    console.log("Parse database response length:", responseText.length);
     
     // Try to parse the response as JSON, with better error handling
     try {
@@ -226,9 +235,9 @@ export const parseDatabase = async (
     } catch (parseError) {
       console.error("JSON parse error:", parseError);
       if (responseText.trim().startsWith('<!DOCTYPE') || responseText.trim().startsWith('<html')) {
-        throw new Error(`Server returned HTML instead of JSON. Please check if the API server is configured correctly to return JSON responses.`);
+        throw new Error(`Server returned HTML instead of JSON. Please check if the API server is running correctly and configured to return JSON responses.`);
       }
-      throw new Error(`Failed to parse server response as JSON. Please check that the API is returning properly formatted JSON data.`);
+      throw new Error(`Failed to parse server response as JSON. Please check that the API is returning properly formatted JSON data. Response starts with: ${responseText.substring(0, 100)}...`);
     }
   } catch (error) {
     console.error('Error parsing database:', error);
