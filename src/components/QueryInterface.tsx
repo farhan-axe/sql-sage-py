@@ -28,6 +28,33 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate }: Query
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef<number | null>(null);
 
+  // Check for non-SQL/non-database questions before submitting
+  const validateQuestion = (text: string): boolean => {
+    if (!text.trim()) {
+      toast({
+        title: "Please enter a question",
+        variant: "destructive",
+      });
+      return false;
+    }
+    
+    if (isNonSqlResponse(text)) {
+      console.log("Non-database question detected:", text);
+      setQueryError("This question does not appear to be related to database content. Please ask a question about the data in your connected database.");
+      toast({
+        title: "Non-database question detected",
+        description: "Please ask a question about your database content",
+        variant: "destructive",
+      });
+      setGeneratedQuery("");
+      setQueryResults(null);
+      setRefinementAttempts([]);
+      return false;
+    }
+    
+    return true;
+  };
+
   useEffect(() => {
     if (isGenerating || isExecuting) {
       startTimeRef.current = Date.now();
@@ -130,17 +157,8 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate }: Query
       return;
     }
 
-    if (isNonSqlResponse(question)) {
-      console.log("Non-database question detected:", question);
-      setQueryError("This question does not appear to be related to database content. Please ask a question about the data in your connected database.");
-      toast({
-        title: "Non-database question detected",
-        description: "Please ask a question about your database content",
-        variant: "destructive",
-      });
-      setGeneratedQuery("");
-      setQueryResults(null);
-      setRefinementAttempts([]);
+    // Move validation to before setting any state
+    if (!validateQuestion(question)) {
       return;
     }
 
@@ -189,6 +207,7 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate }: Query
       const generatedData = await generateResponse.json();
       console.log("Generated response:", generatedData.query);
       
+      // Double check the response also
       if (isNonSqlResponse(generatedData.query)) {
         console.log("Detected non-SQL response, displaying as error message");
         setQueryError("The database does not contain information to answer this question. Please try a different question about your database content.");

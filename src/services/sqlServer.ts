@@ -540,18 +540,23 @@ export const terminateSession = async (
  * @returns Boolean indicating whether the response is non-SQL
  */
 export const isNonSqlResponse = (text: string): boolean => {
+  if (!text) return false;
+  
+  const normalizedText = text.toLowerCase();
+  
   // Check if the response contains specific indicators of non-SQL content
   const nonSqlIndicators = [
-    "I'm sorry",
-    "I apologize",
-    "I can't",
+    "i'm sorry",
+    "i apologize",
+    "i can't",
     "cannot",
-    "As an AI",
+    "as an ai",
     "not authorized",
     "not allowed",
     "unable to",
     "don't have access",
-    "above my capabilities"
+    "above my capabilities",
+    "outside the scope"
   ];
   
   // Add political and general knowledge indicators
@@ -590,20 +595,61 @@ export const isNonSqlResponse = (text: string): boolean => {
     "movie",
     "music",
     "actor",
-    "singer"
+    "singer",
+    "pakistan",
+    "india",
+    "china",
+    "usa",
+    "united states",
+    "europe",
+    "africa",
+    "asia"
+  ];
+  
+  // Check for common question patterns that are not database-related
+  const generalKnowledgePatterns = [
+    /who is/i,
+    /what is/i,
+    /when did/i,
+    /where is/i,
+    /how many people/i,
+    /tell me about/i
   ];
   
   // Check for non-SQL indicators
   const hasNonSqlIndicator = nonSqlIndicators.some(indicator => 
-    text.toLowerCase().includes(indicator.toLowerCase())
+    normalizedText.includes(indicator.toLowerCase())
   );
   
   // Check for political and general knowledge topics
   const hasNonDatabaseTopic = nonDatabaseTopics.some(topic => 
-    text.toLowerCase().includes(topic.toLowerCase())
+    normalizedText.includes(topic.toLowerCase())
   );
   
-  return hasNonSqlIndicator || hasNonDatabaseTopic;
+  // Check for general knowledge question patterns
+  const hasGeneralPattern = generalKnowledgePatterns.some(pattern => 
+    pattern.test(normalizedText)
+  );
+  
+  // Check if the question might be related to actual data
+  const databaseRelatedTerms = [
+    "table", "database", "sql", "query", "select", "row", "column", 
+    "join", "data", "record", "count", "sum", "avg", "where", "from", 
+    "group by", "order by", "having"
+  ];
+  
+  // If there are database-related terms, then it might still be a valid question
+  const hasDatabaseTerms = databaseRelatedTerms.some(term => 
+    normalizedText.includes(term.toLowerCase())
+  );
+  
+  // If the question contains database terms, don't block it even if it might match other patterns
+  if (hasDatabaseTerms) {
+    return false;
+  }
+  
+  // Block if it matches any non-SQL indicator, topic or pattern
+  return hasNonSqlIndicator || hasNonDatabaseTopic || hasGeneralPattern;
 };
 
 // Export the function for external use
