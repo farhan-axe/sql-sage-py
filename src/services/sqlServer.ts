@@ -1,4 +1,3 @@
-
 /**
  * Generates example SQL queries based on the database schema
  * @param tables Array of table information objects
@@ -73,75 +72,133 @@ JOIN DimProduct dp ON cps.ProductKey = dp.ProductKey
 ORDER BY tc.TotalSales DESC, cps.ProductSales DESC;"`;
   }
   
-  // For other databases, generate custom examples
+  // For other databases, generate examples for each table
   let examples = 'Below are some general examples of questions:\n\n';
   
-  // Map of table names to their columns
-  const tableColumns: { [tableName: string]: string[] } = {};
-  
-  // Collect table information
-  tables.forEach(table => {
+  // Sort tables by name for consistency
+  const sortedTables = [...tables].sort((a, b) => {
+    if (a.name && b.name) {
+      return a.name.localeCompare(b.name);
+    }
+    return 0;
+  });
+
+  // First, generate count examples for each table
+  sortedTables.forEach((table, index) => {
     if (table.name) {
-      const columns: string[] = [];
-      if (table.columnDetails && table.columnDetails.length > 0) {
-        table.columnDetails.forEach((column: any) => {
-          columns.push(column.name);
-        });
-      } else if (table.schema && table.schema.length > 0) {
-        table.schema.forEach((column: string) => {
-          if (typeof column === 'string') {
-            // Extract just the column name if it's in a format like "column_name type"
-            const parts = column.split(' ');
-            columns.push(parts[0]);
-          }
-        });
-      }
-      tableColumns[table.name] = columns;
+      // Add count example for each table
+      examples += `${index + 1}. Calculate me the total number of records in ${table.name}?,\n`;
+      examples += `Your SQL Query will be like "SELECT COUNT(*) AS TotalRecords FROM ${table.name};"\n\n`;
     }
   });
   
-  // Sort tables by name for consistency
-  const sortedTableNames = Object.keys(tableColumns).sort();
+  // After generating count examples for all tables, add a few more complex examples
+  const tableCount = sortedTables.length;
+  let exampleIndex = tableCount + 1;
   
-  // Select 2-4 tables to generate examples with
-  const exampleTables = sortedTableNames.slice(0, Math.min(4, sortedTableNames.length));
+  // Find a few representative tables to use for more complex examples
+  const exampleTables = sortedTables.slice(0, Math.min(4, sortedTables.length));
   
-  if (exampleTables.length === 0) {
-    return 'No tables available to generate examples. Please make sure the database contains tables and you have permission to access them.';
+  if (exampleTables.length >= 1) {
+    const table = exampleTables[0];
+    examples += `${exampleIndex}. Show me the top 10 records from ${table.name}?,\n`;
+    examples += `Your SQL Query will be like "SELECT TOP 10 * FROM ${table.name};"\n\n`;
+    exampleIndex++;
   }
   
-  // Example 1: Simple count query
-  const table1 = exampleTables[0];
-  examples += `1. Calculate me the total number of ${table1}?,\n`;
-  examples += `Your SQL Query will be like "SELECT COUNT(*) FROM ${table1};"\n\n`;
-  
   if (exampleTables.length >= 2) {
-    // Example 2: Filtered selection query
+    const table1 = exampleTables[0];
     const table2 = exampleTables[1];
-    const columns2 = tableColumns[table2].slice(0, 3);
     
-    if (columns2.length > 0) {
-      examples += `2. Get me all ${table2} where ${columns2[0]} is greater than a certain value?,\n`;
-      examples += `Your SQL Query will be like "SELECT TOP 100 ${columns2.join(', ')} FROM ${table2} WHERE ${columns2[0]} > [value];"\n\n`;
+    // Find potential join columns (looking for similar column names that might be keys)
+    let joinColumn1 = "ID";
+    let joinColumn2 = "ID";
+    
+    if (table1.columnDetails && table2.columnDetails) {
+      const table1Columns = table1.columnDetails.map((col: any) => col.name || "");
+      const table2Columns = table2.columnDetails.map((col: any) => col.name || "");
+      
+      // Look for matching columns or columns with KEY or ID in the name
+      for (const col1 of table1Columns) {
+        if (col1.toUpperCase().includes('KEY') || col1.toUpperCase().includes('ID')) {
+          joinColumn1 = col1;
+          break;
+        }
+      }
+      
+      for (const col2 of table2Columns) {
+        if (col2.toUpperCase().includes('KEY') || col2.toUpperCase().includes('ID')) {
+          joinColumn2 = col2;
+          break;
+        }
+      }
+    }
+    
+    examples += `${exampleIndex}. Join ${table1.name} with ${table2.name}?,\n`;
+    examples += `Your SQL Query will be like "SELECT t1.*, t2.*\nFROM ${table1.name} t1\nJOIN ${table2.name} t2 ON t1.${joinColumn1} = t2.${joinColumn2};"\n\n`;
+    exampleIndex++;
+  }
+  
+  if (exampleTables.length >= 1) {
+    const table = exampleTables[0];
+    let groupByColumn = "";
+    
+    // Try to find a suitable column for GROUP BY
+    if (table.columnDetails) {
+      const columns = table.columnDetails.map((col: any) => col.name || "");
+      
+      // Look for a categorical column (avoiding ID columns)
+      for (const col of columns) {
+        if (!col.toUpperCase().includes('ID') && 
+            !col.toUpperCase().includes('KEY') && 
+            !col.toUpperCase().includes('DATE')) {
+          groupByColumn = col;
+          break;
+        }
+      }
+      
+      // If no good categorical column was found, just use the first column
+      if (!groupByColumn && columns.length > 0) {
+        groupByColumn = columns[0];
+      }
+    }
+    
+    if (groupByColumn) {
+      examples += `${exampleIndex}. Count records in ${table.name} grouped by ${groupByColumn}?,\n`;
+      examples += `Your SQL Query will be like "SELECT ${groupByColumn}, COUNT(*) AS Count\nFROM ${table.name}\nGROUP BY ${groupByColumn}\nORDER BY Count DESC;"\n\n`;
+      exampleIndex++;
     }
   }
   
-  if (exampleTables.length >= 3) {
-    // Example 3: Join query
-    const table1 = exampleTables[0];
-    const table2 = exampleTables[2];
-    examples += `3. Join ${table1} with ${table2}?,\n`;
-    examples += `Your SQL Query will be like "SELECT t1.*, t2.*\nFROM ${table1} t1\nJOIN ${table2} t2 ON t1.${tableColumns[table1][0]} = t2.${tableColumns[table2][0]};"\n\n`;
-  }
-  
-  if (exampleTables.length >= 2) {
-    // Example 4: Aggregation and group by
-    const table = exampleTables[1];
-    const columns = tableColumns[table];
+  // Add a filter example
+  if (exampleTables.length >= 1) {
+    const table = exampleTables[0];
+    let filterColumn = "";
     
-    if (columns.length >= 2) {
-      examples += `4. Get me the count of ${table} grouped by ${columns[0]}?,\n`;
-      examples += `Your SQL Query will be like "SELECT ${columns[0]}, COUNT(*) as Total\nFROM ${table}\nGROUP BY ${columns[0]}\nORDER BY Total DESC;"\n`;
+    // Try to find a suitable column for filtering
+    if (table.columnDetails) {
+      const columns = table.columnDetails.map((col: any) => col.name || "");
+      
+      // Look for a numeric column
+      for (const col of columns) {
+        if (col.toUpperCase().includes('AMOUNT') || 
+            col.toUpperCase().includes('PRICE') || 
+            col.toUpperCase().includes('COST') ||
+            col.toUpperCase().includes('QUANTITY')) {
+          filterColumn = col;
+          break;
+        }
+      }
+      
+      // If no good numeric column was found, just use the first column
+      if (!filterColumn && columns.length > 0) {
+        filterColumn = columns[0];
+      }
+    }
+    
+    if (filterColumn) {
+      examples += `${exampleIndex}. Get all records from ${table.name} where ${filterColumn} is greater than a specific value?,\n`;
+      examples += `Your SQL Query will be like "SELECT * FROM ${table.name} WHERE ${filterColumn} > [value];"\n\n`;
     }
   }
   

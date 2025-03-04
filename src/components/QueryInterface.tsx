@@ -84,16 +84,19 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate }: Query
   };
 
   const extractSQLQuery = (text: string): string => {
+    // First priority: Look for the "Your SQL Query will be like" format
     const queryFormatMatch = text.match(/Your SQL Query will be like "([\s\S]*?)"/i);
     if (queryFormatMatch) {
       return queryFormatMatch[1].trim();
     }
     
+    // Second priority: Check for SQL code blocks (fallback)
     const sqlBlockMatch = text.match(/```sql\s*([\s\S]*?)\s*```/i);
     if (sqlBlockMatch) {
       return sqlBlockMatch[1].trim();
     }
 
+    // Third priority: Look for SQL keywords and extract the query (last resort)
     const sqlKeywords = ['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'WITH'];
     const lines = text.split('\n');
     const queryLines = [];

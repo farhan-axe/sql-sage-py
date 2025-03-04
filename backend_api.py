@@ -45,6 +45,7 @@ async def generate_query(request: QueryGenerationRequest):
 13. **If the question asks for Customer Wise, Product Wise or Category Wise Count, for aggregated function then always use GROUP BY CLAUSE.**
 14. **Do not include ORDER BY clauses in subqueries, common table expressions, derived tables, inline functions, or views unless accompanied by TOP, OFFSET, or FOR XML, to avoid SQL Server errors.**
 15. **Always use SQL Server syntax: use TOP instead of LIMIT for row limitations.**
+16. **You MUST respond in the exact format: 'Your SQL Query will be like \"SELECT ... FROM ...\"'**
 
 """
 
@@ -116,6 +117,8 @@ ORDER BY tc.TotalSales DESC, cps.ProductSales DESC;"
 
 Here are the output rules:
 {output_rules}
+
+IMPORTANT: Your output MUST follow the pattern "Your SQL Query will be like \"SQL QUERY HERE\"". Do not include triple backticks, explanations, or any other text.
 
 User Question: {request.question} by looking at existing database table
 
