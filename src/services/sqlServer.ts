@@ -71,7 +71,7 @@ function generateQueryExamples(tables: any[]): string {
         examples += `FROM ${tableName}\n`;
         examples += `GROUP BY ${groupByColumn}\n`;
         examples += `ORDER BY Count DESC;\n`;
-        examples += '```\n`;
+        examples += '```\n'; // Fixed the mismatched quotes here
       }
     }
   });
