@@ -1,3 +1,4 @@
+
 /**
  * Generates example SQL queries based on the database schema
  * @param tables Array of table information objects
@@ -69,8 +70,7 @@ FROM TopCustomers tc
 JOIN DimCustomer dc ON tc.CustomerKey = dc.CustomerKey
 JOIN CustomerProductSales cps ON tc.CustomerKey = cps.CustomerKey
 JOIN DimProduct dp ON cps.ProductKey = dp.ProductKey
-ORDER BY tc.TotalSales DESC, cps.ProductSales DESC;
-"`;
+ORDER BY tc.TotalSales DESC, cps.ProductSales DESC;"`;
   }
   
   // For other databases, generate custom examples

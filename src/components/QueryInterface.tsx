@@ -84,6 +84,11 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate }: Query
   };
 
   const extractSQLQuery = (text: string): string => {
+    const queryFormatMatch = text.match(/Your SQL Query will be like "([\s\S]*?)"/i);
+    if (queryFormatMatch) {
+      return queryFormatMatch[1].trim();
+    }
+    
     const sqlBlockMatch = text.match(/```sql\s*([\s\S]*?)\s*```/i);
     if (sqlBlockMatch) {
       return sqlBlockMatch[1].trim();
