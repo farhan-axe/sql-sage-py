@@ -1,4 +1,3 @@
-
 /**
  * Generates example SQL queries based on the database schema
  * @param tables Array of table information objects
@@ -439,12 +438,22 @@ export const parseDatabase = async (
       let promptTemplate = "Below is the database schema\n\n";
       tables.forEach((table: any) => {
         if (table.name) {
-          promptTemplate += `Table: ${table.name}\n`;
+          // Updated format to match the requested style
+          promptTemplate += `There is table name ${table.name} used for calculating records based on ${table.primaryKey || 'None defined'} and below are the columns mentioned:\n\n`;
+          promptTemplate += `SELECT\n`;
+          
           if (table.schema && table.schema.length > 0) {
-            table.schema.forEach((column: string) => {
-              promptTemplate += `- ${column}\n`;
+            table.schema.forEach((column: string, index: number) => {
+              // Add commas after each column except the last one
+              if (index < table.schema.length - 1) {
+                promptTemplate += `${column},\n`;
+              } else {
+                promptTemplate += `${column}\n`;
+              }
             });
           }
+          
+          promptTemplate += `FROM ${table.name};\n\n`;
           promptTemplate += `Primary Key: ${table.primaryKey || 'None defined'}\n\n`;
         }
       });
