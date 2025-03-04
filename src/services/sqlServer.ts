@@ -1,4 +1,3 @@
-
 /**
  * Generates example SQL queries based on the database schema
  * @param tables Array of table information objects
@@ -65,13 +64,13 @@ function generateQueryExamples(tables: any[]): string {
           col.toLowerCase().includes('province')
         ) || columns[1];
         
-        examples += `3. THIS TABLE COUNT RECORDS BY ${groupByColumn.toUpperCase()} WITH GROUPBY:\n\n`;
+        examples += `3. Count records by ${groupByColumn} with grouping:\n\n`;
         examples += '```sql\n';
         examples += `SELECT ${groupByColumn}, COUNT(*) AS Count\n`;
         examples += `FROM ${tableName}\n`;
         examples += `GROUP BY ${groupByColumn}\n`;
         examples += `ORDER BY Count DESC;\n`;
-        examples += '```\n';
+        examples += '```\n`;
       }
     }
   });
