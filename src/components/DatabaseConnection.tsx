@@ -9,7 +9,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { connectToServer, parseDatabase } from "@/services/sqlServer";
 import type { DatabaseInfo, ConnectionConfig } from "@/types/database";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, InfoIcon } from "lucide-react";
 
 interface DatabaseConnectionProps {
   onConnect: (info: DatabaseInfo) => void;
@@ -93,6 +93,15 @@ const DatabaseConnection = ({ onConnect, isParsing, setIsParsing }: DatabaseConn
 
   return (
     <div className="space-y-6">
+      <Alert className="bg-blue-50 border-blue-200">
+        <InfoIcon className="h-4 w-4 text-blue-600" />
+        <AlertTitle>Backend Required</AlertTitle>
+        <AlertDescription className="text-sm">
+          Make sure your backend server is running on http://localhost:3001 
+          before connecting. No connection requests will work without the backend server.
+        </AlertDescription>
+      </Alert>
+
       {connectionError && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
@@ -102,6 +111,7 @@ const DatabaseConnection = ({ onConnect, isParsing, setIsParsing }: DatabaseConn
             {connectionError.includes('HTML instead of JSON') && (
               <div className="mt-2 text-sm">
                 <p>Make sure your backend server is running at http://localhost:3001</p>
+                <p className="mt-1">The connection URL is: http://localhost:3001/api/sql/connect</p>
               </div>
             )}
           </AlertDescription>

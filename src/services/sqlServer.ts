@@ -1,3 +1,4 @@
+
 /**
  * Generates example SQL queries based on the database schema
  * @param tables Array of table information objects
@@ -97,20 +98,36 @@ export const connectToServer = async (config: {
       // Don't log the password for security reasons
     }));
     
-    // Update the API endpoint to explicitly use the correct port
+    // Explicitly use the correct URL with protocol and port
     const apiUrl = 'http://localhost:3001/api/sql/connect';
     
     console.log("Sending API request to:", apiUrl);
+    
+    // Add timeout to prevent hanging connections
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
     
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Accept': 'application/json',
       },
       body: JSON.stringify(config),
+      signal: controller.signal,
     });
     
+    clearTimeout(timeoutId);
+    
     console.log("Server response status:", response.status);
+    
+    // Check if the response is HTML by looking at content-type header
+    const contentType = response.headers.get('content-type');
+    const isHtmlResponse = contentType && contentType.includes('text/html');
+    
+    if (isHtmlResponse) {
+      throw new Error(`Server returned HTML instead of JSON. Status: ${response.status}. Make sure your backend API is running at ${apiUrl} and returning JSON responses.`);
+    }
     
     if (!response.ok) {
       const errorText = await response.text();
@@ -134,6 +151,7 @@ export const connectToServer = async (config: {
     
     const responseText = await response.text();
     console.log("Response text length:", responseText.length);
+    console.log("Response text preview:", responseText.substring(0, 100));
     
     if (!responseText.trim()) {
       throw new Error('Empty response from server');
@@ -146,12 +164,15 @@ export const connectToServer = async (config: {
     } catch (parseError) {
       console.error("JSON parse error:", parseError);
       if (responseText.trim().startsWith('<!DOCTYPE') || responseText.trim().startsWith('<html')) {
-        throw new Error(`Server returned HTML instead of JSON. Please check if the API server is running correctly and configured to return JSON responses.`);
+        throw new Error(`Server returned HTML instead of JSON. Please check if the API server is running correctly at http://localhost:3001 and configured to return JSON responses.`);
       }
       throw new Error(`Failed to parse server response as JSON. The server might not be returning valid JSON data. Response starts with: ${responseText.substring(0, 100)}...`);
     }
   } catch (error) {
     console.error('Error connecting to server:', error);
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Connection timed out after 30 seconds. Please check if the backend server is running at http://localhost:3001.');
+    }
     throw error;
   }
 };
@@ -179,11 +200,18 @@ export const parseDatabase = async (
   try {
     console.log(`Parsing database schema for ${database} on ${server}`);
     
-    // Update to explicitly use port 3001
-    const response = await fetch('http://localhost:3001/api/sql/parse', {
+    // Explicitly use the correct URL with protocol and port
+    const apiUrl = 'http://localhost:3001/api/sql/parse';
+    
+    // Add timeout to prevent hanging connections
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
+    
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Accept': 'application/json',
       },
       body: JSON.stringify({
         server,
@@ -191,7 +219,18 @@ export const parseDatabase = async (
         useWindowsAuth,
         ...(sqlAuth && { username: sqlAuth.username, password: sqlAuth.password }),
       }),
+      signal: controller.signal,
     });
+    
+    clearTimeout(timeoutId);
+    
+    // Check if the response is HTML by looking at content-type header
+    const contentType = response.headers.get('content-type');
+    const isHtmlResponse = contentType && contentType.includes('text/html');
+    
+    if (isHtmlResponse) {
+      throw new Error(`Server returned HTML instead of JSON. Status: ${response.status}. Make sure your backend API is running at ${apiUrl} and returning JSON responses.`);
+    }
     
     if (!response.ok) {
       const errorText = await response.text();
@@ -199,7 +238,7 @@ export const parseDatabase = async (
       
       // Check if the error response contains HTML
       if (errorText.trim().startsWith('<!DOCTYPE') || errorText.trim().startsWith('<html')) {
-        throw new Error(`Server returned HTML instead of JSON. Status: ${response.status}. This usually indicates that the API server is not running or the endpoint doesn't exist. Make sure your backend API is running at /api/sql/parse.`);
+        throw new Error(`Server returned HTML instead of JSON. Status: ${response.status}. This usually indicates that the API server is not running or the endpoint doesn't exist. Make sure your backend API is running at ${apiUrl}.`);
       }
       
       let errorDetail;
@@ -215,6 +254,7 @@ export const parseDatabase = async (
     
     const responseText = await response.text();
     console.log("Parse database response length:", responseText.length);
+    console.log("Response text preview:", responseText.substring(0, 100));
     
     // Try to parse the response as JSON, with better error handling
     try {
@@ -237,12 +277,15 @@ export const parseDatabase = async (
     } catch (parseError) {
       console.error("JSON parse error:", parseError);
       if (responseText.trim().startsWith('<!DOCTYPE') || responseText.trim().startsWith('<html')) {
-        throw new Error(`Server returned HTML instead of JSON. Please check if the API server is running correctly and configured to return JSON responses.`);
+        throw new Error(`Server returned HTML instead of JSON. Please check if the API server is running correctly at http://localhost:3001 and configured to return JSON responses.`);
       }
       throw new Error(`Failed to parse server response as JSON. Please check that the API is returning properly formatted JSON data. Response starts with: ${responseText.substring(0, 100)}...`);
     }
   } catch (error) {
     console.error('Error parsing database:', error);
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Connection timed out after 60 seconds. Please check if the backend server is running at http://localhost:3001.');
+    }
     throw error;
   }
 };
@@ -262,11 +305,14 @@ export const terminateSession = async (
   sqlAuth?: { username: string; password: string }
 ): Promise<boolean> => {
   try {
-    // Update to explicitly use port 3001
-    const response = await fetch('http://localhost:3001/api/sql/terminate', {
+    // Explicitly use the correct URL with protocol and port
+    const apiUrl = 'http://localhost:3001/api/sql/terminate';
+    
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Accept': 'application/json',
       },
       body: JSON.stringify({
         server,
