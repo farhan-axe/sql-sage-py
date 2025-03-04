@@ -1,9 +1,11 @@
+
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { DatabaseInfo, QueryRefinementAttempt, QueryErrorType } from "@/types/database";
 import DataDisplay from "./DataDisplay";
+import ChartVisualization from "./ChartVisualization";
 import { RotateCcw, PlayCircle, XCircle, Clock, AlertCircle } from "lucide-react";
 import { terminateSession, isNonSqlResponse } from "@/services/sqlServer";
 
@@ -552,6 +554,11 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate }: Query
             Query Results {queryResults.length > 0 && <span className="text-xs text-gray-500">(Limited to 200 rows)</span>}
           </h3>
           <DataDisplay data={queryResults} />
+          
+          {/* Chart visualization component */}
+          {queryResults.length > 0 && (
+            <ChartVisualization data={queryResults} />
+          )}
         </div>
       )}
     </div>

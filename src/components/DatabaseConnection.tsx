@@ -9,12 +9,19 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { connectToServer, parseDatabase } from "@/services/sqlServer";
 import type { DatabaseInfo, ConnectionConfig } from "@/types/database";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle, InfoIcon, CheckCircle2, Loader2, DatabaseIcon } from "lucide-react";
+import { AlertCircle, InfoIcon, CheckCircle2, Loader2, DatabaseIcon, PlusCircle, X } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 
 interface DatabaseConnectionProps {
   onConnect: (info: DatabaseInfo) => void;
   isParsing: boolean;
   setIsParsing: (isParsing: boolean) => void;
+}
+
+interface DatabaseSelection {
+  database: string;
+  parsed: boolean;
 }
 
 const DatabaseConnection = ({ onConnect, isParsing, setIsParsing }: DatabaseConnectionProps) => {
@@ -23,12 +30,13 @@ const DatabaseConnection = ({ onConnect, isParsing, setIsParsing }: DatabaseConn
   const [authType, setAuthType] = useState("windows"); // "windows" or "sql"
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [selectedDb, setSelectedDb] = useState("");
+  const [selectedDbs, setSelectedDbs] = useState<DatabaseSelection[]>([]);
   const [databases, setDatabases] = useState<string[]>([]);
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [connectionSuccess, setConnectionSuccess] = useState(false);
   const [parseError, setParseError] = useState<string | null>(null);
+  const [currentDbSelection, setCurrentDbSelection] = useState("");
 
   const handleConnect = async () => {
     setIsConnecting(true);
@@ -51,7 +59,7 @@ const DatabaseConnection = ({ onConnect, isParsing, setIsParsing }: DatabaseConn
       setConnectionSuccess(true);
       toast({
         title: "Connected successfully",
-        description: "You can now select a database",
+        description: "You can now select databases to parse",
       });
     } catch (error) {
       console.error('Connection error details:', error);
@@ -66,15 +74,28 @@ const DatabaseConnection = ({ onConnect, isParsing, setIsParsing }: DatabaseConn
     }
   };
 
-  const handleParseDatabase = async () => {
+  const addDatabase = () => {
+    if (!currentDbSelection || selectedDbs.some(db => db.database === currentDbSelection)) {
+      return;
+    }
+    
+    setSelectedDbs([...selectedDbs, { database: currentDbSelection, parsed: false }]);
+    setCurrentDbSelection("");
+  };
+
+  const removeDatabase = (dbName: string) => {
+    setSelectedDbs(selectedDbs.filter(db => db.database !== dbName));
+  };
+
+  const handleParseDatabase = async (dbName: string) => {
     setIsParsing(true);
     setParseError(null);
     try {
-      console.log(`Starting database parsing for ${selectedDb} on ${server}`);
+      console.log(`Starting database parsing for ${dbName} on ${server}`);
       
       const parseResult = await parseDatabase(
         server,
-        selectedDb,
+        dbName,
         authType === "windows",
         authType === "sql" ? { username, password } : undefined
       );
@@ -86,6 +107,11 @@ const DatabaseConnection = ({ onConnect, isParsing, setIsParsing }: DatabaseConn
         hasQueryExamples: !!parseResult.queryExamples,
         queryExamplesLength: parseResult.queryExamples?.length || 0
       });
+
+      // Mark this database as parsed
+      setSelectedDbs(prev => prev.map(db => 
+        db.database === dbName ? { ...db, parsed: true } : db
+      ));
 
       if (!parseResult.schema || parseResult.schema.length === 0) {
         setParseError("No tables found in the database. The schema might be empty or not accessible.");
@@ -236,33 +262,82 @@ const DatabaseConnection = ({ onConnect, isParsing, setIsParsing }: DatabaseConn
       {databases.length > 0 && (
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label>Select Database</Label>
-            <Select onValueChange={setSelectedDb} value={selectedDb}>
-              <SelectTrigger>
-                <SelectValue placeholder="Choose a database" />
-              </SelectTrigger>
-              <SelectContent>
-                {databases.map((db) => (
-                  <SelectItem key={db} value={db}>
-                    {db}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Label>Select Databases to Parse</Label>
+            
+            {/* Selected databases list */}
+            {selectedDbs.length > 0 && (
+              <div className="mb-4 space-y-2">
+                <Label className="text-sm text-gray-600">Selected Databases:</Label>
+                <div className="space-y-2">
+                  {selectedDbs.map((db) => (
+                    <Card key={db.database} className={`bg-gray-50 ${db.parsed ? 'border-green-200' : ''}`}>
+                      <CardContent className="p-3 flex justify-between items-center">
+                        <div className="flex items-center space-x-2">
+                          <DatabaseIcon className="h-4 w-4 text-gray-500" />
+                          <span>{db.database}</span>
+                          {db.parsed && (
+                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                              Parsed
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex space-x-2">
+                          {!db.parsed && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleParseDatabase(db.database)}
+                              disabled={isParsing}
+                              className="h-8 text-xs"
+                            >
+                              {isParsing ? <Loader2 className="h-3 w-3 animate-spin" /> : "Parse"}
+                            </Button>
+                          )}
+                          <Button
+                            size="sm" 
+                            variant="ghost" 
+                            className="h-8 w-8 p-0 text-gray-500"
+                            onClick={() => removeDatabase(db.database)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {/* Add database selector */}
+            <div className="flex space-x-2">
+              <Select 
+                value={currentDbSelection} 
+                onValueChange={setCurrentDbSelection}
+              >
+                <SelectTrigger className="flex-1">
+                  <SelectValue placeholder="Choose a database" />
+                </SelectTrigger>
+                <SelectContent>
+                  {databases
+                    .filter(db => !selectedDbs.some(selected => selected.database === db))
+                    .map((db) => (
+                      <SelectItem key={db} value={db}>
+                        {db}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+              <Button
+                onClick={addDatabase}
+                disabled={!currentDbSelection}
+                size="icon"
+                className="h-10 w-10"
+              >
+                <PlusCircle className="h-5 w-5" />
+              </Button>
+            </div>
           </div>
-
-          <Button
-            onClick={handleParseDatabase}
-            disabled={!selectedDb || isParsing}
-            className="w-full bg-blue-700 hover:bg-blue-800"
-          >
-            {isParsing ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Parsing Database...
-              </>
-            ) : "Parse Database"}
-          </Button>
         </div>
       )}
     </div>
