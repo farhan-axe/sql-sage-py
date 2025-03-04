@@ -8,6 +8,8 @@ import { useToast } from "@/components/ui/use-toast";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { connectToServer, parseDatabase } from "@/services/sqlServer";
 import type { DatabaseInfo, ConnectionConfig } from "@/types/database";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 
 interface DatabaseConnectionProps {
   onConnect: (info: DatabaseInfo) => void;
@@ -24,10 +26,18 @@ const DatabaseConnection = ({ onConnect, isParsing, setIsParsing }: DatabaseConn
   const [selectedDb, setSelectedDb] = useState("");
   const [databases, setDatabases] = useState<string[]>([]);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
 
   const handleConnect = async () => {
     setIsConnecting(true);
+    setConnectionError(null);
     try {
+      console.log("Starting connection with:", {
+        server,
+        authType,
+        username: authType === "sql" ? username : undefined
+      });
+      
       const dbs = await connectToServer({
         server,
         useWindowsAuth: authType === "windows",
@@ -40,18 +50,21 @@ const DatabaseConnection = ({ onConnect, isParsing, setIsParsing }: DatabaseConn
         description: "You can now select a database",
       });
     } catch (error) {
+      console.error('Connection error details:', error);
+      setConnectionError(error instanceof Error ? error.message : 'Unknown connection error');
       toast({
         title: "Connection failed",
         description: "Please check your credentials and try again",
         variant: "destructive",
       });
-      console.error('Connection error:', error);
+    } finally {
+      setIsConnecting(false);
     }
-    setIsConnecting(false);
   };
 
   const handleParseDatabase = async () => {
     setIsParsing(true);
+    setConnectionError(null);
     try {
       const parseResult = await parseDatabase(
         server,
@@ -60,36 +73,36 @@ const DatabaseConnection = ({ onConnect, isParsing, setIsParsing }: DatabaseConn
         authType === "sql" ? { username, password } : undefined
       );
 
-      const connectionConfig: ConnectionConfig = {
-        server,
-        database: selectedDb,
-        useWindowsAuth: authType === "windows",
-        ...(authType === "sql" && { username, password })
-      };
-      
-      const databaseInfo: DatabaseInfo = {
-        ...parseResult,
-        connectionConfig
-      };
-      
-      onConnect(databaseInfo);
+      onConnect(parseResult);
       toast({
         title: "Database parsed successfully",
         description: "You can now start querying the database",
       });
     } catch (error) {
+      console.error('Parsing error details:', error);
+      setConnectionError(error instanceof Error ? error.message : 'Unknown parsing error');
       toast({
         title: "Parsing failed",
         description: "Error parsing database schema",
         variant: "destructive",
       });
-      console.error('Parsing error:', error);
+    } finally {
+      setIsParsing(false);
     }
-    setIsParsing(false);
   };
 
   return (
     <div className="space-y-6">
+      {connectionError && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Connection failed</AlertTitle>
+          <AlertDescription>
+            {connectionError}
+          </AlertDescription>
+        </Alert>
+      )}
+
       <div className="space-y-2">
         <Label htmlFor="server">Server</Label>
         <Input

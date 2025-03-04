@@ -71,38 +71,10 @@ function generateQueryExamples(tables: any[]): string {
         examples += `FROM ${tableName}\n`;
         examples += `GROUP BY ${groupByColumn}\n`;
         examples += `ORDER BY Count DESC;\n`;
-        examples += '```\n';
+        examples += '```\n`;
       }
     }
   });
-  
-  // Add a cross-table query example if we have multiple tables
-  const tableNames = Object.keys(tableColumns);
-  if (tableNames.length >= 2) {
-    examples += '\n\n### Cross-table queries:\n\n';
-    examples += `1. Join ${tableNames[0]} with ${tableNames[1]} on a common column:\n\n`;
-    examples += '```sql\n';
-    
-    // Find a common column between the tables
-    const commonColumns = tableColumns[tableNames[0]].filter(col => 
-      tableColumns[tableNames[1]].includes(col)
-    );
-    
-    if (commonColumns.length > 0) {
-      const joinColumn = commonColumns[0];
-      examples += `SELECT TOP 10 a.*, b.*\n`;
-      examples += `FROM ${tableNames[0]} AS a\n`;
-      examples += `JOIN ${tableNames[1]} AS b ON a.${joinColumn} = b.${joinColumn};\n`;
-    } else {
-      // If no common columns found, suggest using an artificial example
-      examples += `-- Note: No common columns found, but you could join if there were one\n`;
-      examples += `SELECT TOP 10 a.*, b.*\n`;
-      examples += `FROM ${tableNames[0]} AS a\n`;
-      examples += `JOIN ${tableNames[1]} AS b ON a.CommonColumn = b.CommonColumn;\n`;
-    }
-    
-    examples += '```\n';
-  }
   
   return examples;
 }
@@ -119,7 +91,12 @@ export const connectToServer = async (config: {
   password?: string; 
 }): Promise<string[]> => {
   try {
-    const response = await fetch('/api/sql/connect', {
+    console.log("Connecting to server with config:", config);
+    
+    // Check if we're running in development or if the API is accessible
+    const apiUrl = '/api/sql/connect';
+    
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -127,13 +104,32 @@ export const connectToServer = async (config: {
       body: JSON.stringify(config),
     });
     
+    console.log("Server response status:", response.status);
+    
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.detail || 'Failed to connect to the server');
+      const errorText = await response.text();
+      console.error("Error response text:", errorText);
+      
+      let errorDetail;
+      try {
+        const errorData = JSON.parse(errorText);
+        errorDetail = errorData.detail || 'Failed to connect to the server';
+      } catch (e) {
+        errorDetail = 'Failed to connect to the server: ' + errorText;
+      }
+      
+      throw new Error(errorDetail);
     }
     
-    const data = await response.json();
-    return data.databases;
+    const responseText = await response.text();
+    console.log("Response text:", responseText);
+    
+    if (!responseText.trim()) {
+      throw new Error('Empty response from server');
+    }
+    
+    const data = JSON.parse(responseText);
+    return data.databases || [];
   } catch (error) {
     console.error('Error connecting to server:', error);
     throw error;
@@ -157,6 +153,8 @@ export const parseDatabase = async (
   schema: any[];
   promptTemplate: string;
   queryExamples: string;
+  connectionConfig: { server: string; database: string; useWindowsAuth: boolean; username?: string; password?: string; };
+  tables: any[]; // Adding this to match the DatabaseInfo interface
 }> => {
   try {
     const response = await fetch('/api/sql/parse', {
@@ -184,7 +182,14 @@ export const parseDatabase = async (
     return {
       schema: data.schema,
       promptTemplate: data.promptTemplate,
-      queryExamples
+      queryExamples,
+      connectionConfig: {
+        server,
+        database,
+        useWindowsAuth,
+        ...(sqlAuth && { username: sqlAuth.username, password: sqlAuth.password })
+      },
+      tables: data.schema || [] // Use the schema as tables to match the interface
     };
   } catch (error) {
     console.error('Error parsing database:', error);
