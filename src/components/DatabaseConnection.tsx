@@ -54,7 +54,7 @@ const DatabaseConnection = ({ onConnect, isParsing, setIsParsing }: DatabaseConn
       setConnectionError(error instanceof Error ? error.message : 'Unknown connection error');
       toast({
         title: "Connection failed",
-        description: "Please check your credentials and try again",
+        description: "Please ensure the backend server is running on http://localhost:3001",
         variant: "destructive",
       });
     } finally {
@@ -99,6 +99,11 @@ const DatabaseConnection = ({ onConnect, isParsing, setIsParsing }: DatabaseConn
           <AlertTitle>Connection failed</AlertTitle>
           <AlertDescription>
             {connectionError}
+            {connectionError.includes('HTML instead of JSON') && (
+              <div className="mt-2 text-sm">
+                <p>Make sure your backend server is running at http://localhost:3001</p>
+              </div>
+            )}
           </AlertDescription>
         </Alert>
       )}

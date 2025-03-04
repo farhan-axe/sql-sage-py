@@ -1,4 +1,3 @@
-
 /**
  * Generates example SQL queries based on the database schema
  * @param tables Array of table information objects
@@ -98,8 +97,10 @@ export const connectToServer = async (config: {
       // Don't log the password for security reasons
     }));
     
-    // Check if we're running in development or if the API is accessible
-    const apiUrl = '/api/sql/connect';
+    // Update the API endpoint to explicitly use the correct port
+    const apiUrl = 'http://localhost:3001/api/sql/connect';
+    
+    console.log("Sending API request to:", apiUrl);
     
     const response = await fetch(apiUrl, {
       method: 'POST',
@@ -178,7 +179,8 @@ export const parseDatabase = async (
   try {
     console.log(`Parsing database schema for ${database} on ${server}`);
     
-    const response = await fetch('/api/sql/parse', {
+    // Update to explicitly use port 3001
+    const response = await fetch('http://localhost:3001/api/sql/parse', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -260,7 +262,8 @@ export const terminateSession = async (
   sqlAuth?: { username: string; password: string }
 ): Promise<boolean> => {
   try {
-    const response = await fetch('/api/sql/terminate', {
+    // Update to explicitly use port 3001
+    const response = await fetch('http://localhost:3001/api/sql/terminate', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

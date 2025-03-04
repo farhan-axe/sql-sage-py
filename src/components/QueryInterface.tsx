@@ -122,7 +122,6 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate }: Query
       return;
     }
 
-    // Check if the question is likely not database-related before sending to backend
     if (isNonSqlResponse(question)) {
       setQueryError("This question does not appear to be related to database content. Please ask a question about the data in your connected database.");
       toast({
@@ -130,18 +129,18 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate }: Query
         description: "Please ask a question about your database content",
         variant: "destructive",
       });
-      setGeneratedQuery(""); // Clear any previous query
-      setQueryResults(null); // Clear any previous results
-      setRefinementAttempts([]); // Clear previous refinement attempts
+      setGeneratedQuery("");
+      setQueryResults(null);
+      setRefinementAttempts([]);
       return;
     }
 
     setIsGenerating(true);
-    setGeneratedQuery(""); // Clear any previous query
-    setQueryResults(null); // Clear any previous results
-    setRefinementAttempts([]); // Clear previous refinement attempts
-    setQueryError(null); // Clear any previous errors
-    
+    setGeneratedQuery("");
+    setQueryResults(null);
+    setRefinementAttempts([]);
+    setQueryError(null);
+
     const newController = new AbortController();
     setController(newController);
     
@@ -181,21 +180,18 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate }: Query
       const generatedData = await generateResponse.json();
       console.log("Generated response:", generatedData.query);
       
-      // Check for non-SQL responses, raw model outputs, or informational messages
       if (isNonSqlResponse(generatedData.query)) {
         console.log("Detected non-SQL response, displaying as error message");
-        // This is an informational message or error, not a SQL query
         setQueryError("The database does not contain information to answer this question. Please try a different question about your database content.");
         toast({
           title: "Cannot generate SQL query",
           description: "The database does not contain the requested information",
           variant: "destructive",
         });
-        setGeneratedQuery(""); // Clear any previously generated query
+        setGeneratedQuery("");
         return;
       }
       
-      // If we get here, we should have a valid SQL query to extract
       const cleanedQuery = extractSQLQuery(generatedData.query);
       console.log("Cleaned query:", cleanedQuery);
       
@@ -209,7 +205,6 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate }: Query
         finalQuery = finalQuery.replace(/SELECT/i, 'SELECT TOP 200');
       }
       
-      // Add this as the first attempt
       setRefinementAttempts([{
         attempt: 1,
         query: finalQuery
@@ -291,14 +286,12 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate }: Query
 
       const responseData = await executeResponse.json();
       
-      // Check if there are refined queries in the response
       if (responseData.refinements && responseData.refinements.length > 0) {
-        // Update the refinement attempts with the new data
         const updatedAttempts = [...refinementAttempts];
         
         responseData.refinements.forEach((refinement: any, index: number) => {
           updatedAttempts.push({
-            attempt: index + 2, // +2 because attempt 1 is the original query
+            attempt: index + 2,
             query: refinement.query,
             error: refinement.error
           });
@@ -306,14 +299,12 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate }: Query
         
         setRefinementAttempts(updatedAttempts);
         
-        // If there was a successful refinement, update the generated query
         if (responseData.refinements.length > 0 && responseData.results) {
           const lastRefinement = responseData.refinements[responseData.refinements.length - 1];
           setGeneratedQuery(lastRefinement.query);
         }
       }
       
-      // Set the results if available
       if (responseData.results) {
         console.log("Query results:", responseData.results);
         setQueryResults(responseData.results);
@@ -380,8 +371,6 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate }: Query
           onSessionTerminate(success);
         } catch (error) {
           console.error("Failed to terminate session on the backend:", error);
-          // Call onSessionTerminate with true to avoid disrupting the UI flow
-          // even if the backend termination failed
           onSessionTerminate(true);
         }
       }
