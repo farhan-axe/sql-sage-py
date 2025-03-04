@@ -261,7 +261,7 @@ export const parseDatabase = async (
         
         // Instead of throwing an error, we'll provide a more helpful template and examples
         const noTablesMessage = "No tables found in the selected database. The schema might be empty or you might not have permissions to access it.";
-        const schemaPlaceholder = "## Database Schema\n\n" + noTablesMessage;
+        const schemaPlaceholder = "Below is the database schema\n\n" + noTablesMessage;
         
         return {
           schema: [],
@@ -279,8 +279,8 @@ export const parseDatabase = async (
       
       console.log(`Parsed schema successfully with ${tables.length} tables`);
       
-      // Generate prompt template from the tables data
-      let promptTemplate = "## Database Schema\n\n";
+      // Generate prompt template from the tables data with updated title format
+      let promptTemplate = "Below is the database schema\n\n";
       tables.forEach((table: any) => {
         if (table.name) {
           promptTemplate += `Table: ${table.name}\n`;
