@@ -180,7 +180,7 @@ export const parseDatabase = async (
   promptTemplate: string;
   queryExamples: string;
   connectionConfig: { server: string; database: string; useWindowsAuth: boolean; username?: string; password?: string; };
-  tables: any[]; // Adding this to match the DatabaseInfo interface
+  tables: any[];
 }> => {
   try {
     console.log(`Parsing database schema for ${database} on ${server}`);
@@ -251,9 +251,13 @@ export const parseDatabase = async (
       // Add detailed logging to see what's in the parsed data
       console.log("Parsed data from backend:", JSON.stringify(data, null, 2));
       
-      // Check if schema is empty or undefined and provide better logging
-      if (!data.schema || data.schema.length === 0) {
-        console.warn("Received empty schema from server, data:", JSON.stringify(data));
+      // CRITICAL FIX: Backend returns 'tables' but frontend expects 'schema'
+      // Map the response correctly based on what we saw in the backend code
+      const tables = data.tables || [];
+      
+      // Check if tables is empty or undefined and provide better logging
+      if (!tables || tables.length === 0) {
+        console.warn("Received empty tables from server, data:", JSON.stringify(data));
         
         // Instead of throwing an error, we'll provide a more helpful template and examples
         const noTablesMessage = "No tables found in the selected database. The schema might be empty or you might not have permissions to access it.";
@@ -273,41 +277,30 @@ export const parseDatabase = async (
         };
       }
       
-      console.log(`Parsed schema successfully with ${data.schema.length} tables`);
+      console.log(`Parsed schema successfully with ${tables.length} tables`);
       
-      // Generate query examples
-      const queryExamples = generateQueryExamples(data.schema || []);
+      // Generate prompt template from the tables data
+      let promptTemplate = "## Database Schema\n\n";
+      tables.forEach((table: any) => {
+        if (table.name) {
+          promptTemplate += `Table: ${table.name}\n`;
+          if (table.schema && table.schema.length > 0) {
+            table.schema.forEach((column: string) => {
+              promptTemplate += `- ${column}\n`;
+            });
+          }
+          promptTemplate += `Primary Key: ${table.primaryKey || 'None defined'}\n\n`;
+        }
+      });
+      
+      // Generate query examples based on the tables data
+      const queryExamples = generateQueryExamples(tables);
       console.log("Generated query examples:", queryExamples.substring(0, 200) + "...");
       
-      // Add schema debug logging
-      if (data.promptTemplate) {
-        console.log("Prompt template present, length:", data.promptTemplate.length);
-      } else {
-        console.warn("No prompt template in response");
-        // Create a simple prompt template from the schema if one wasn't provided
-        let generatedPromptTemplate = "## Database Schema\n\n";
-        (data.schema || []).forEach((table: any) => {
-          if (table.name) {
-            generatedPromptTemplate += `Table: ${table.name}\n`;
-            if (table.schema && table.schema.length > 0) {
-              table.schema.forEach((column: string) => {
-                generatedPromptTemplate += `- ${column}\n`;
-              });
-            } else if (table.columnDetails && table.columnDetails.length > 0) {
-              table.columnDetails.forEach((column: any) => {
-                generatedPromptTemplate += `- ${column.name} (${column.type})\n`;
-              });
-            }
-            generatedPromptTemplate += "\n";
-          }
-        });
-        data.promptTemplate = generatedPromptTemplate;
-      }
-      
-      // Return the parsed data
+      // Return the correctly mapped data
       return {
-        schema: data.schema || [],
-        promptTemplate: data.promptTemplate || 'No schema information was returned from the server.',
+        schema: tables, // Use tables data for schema
+        promptTemplate: promptTemplate,
         queryExamples,
         connectionConfig: {
           server,
@@ -315,7 +308,7 @@ export const parseDatabase = async (
           useWindowsAuth,
           ...(sqlAuth && { username: sqlAuth.username, password: sqlAuth.password })
         },
-        tables: data.schema || [] // Use the schema as tables to match the interface
+        tables: tables // This matches what the interface expects
       };
     } catch (parseError) {
       console.error("JSON parse error:", parseError);
