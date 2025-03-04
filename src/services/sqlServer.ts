@@ -1,3 +1,4 @@
+
 /**
  * Generates example SQL queries based on the database schema
  * @param tables Array of table information objects
@@ -70,7 +71,7 @@ function generateQueryExamples(tables: any[]): string {
         examples += `FROM ${tableName}\n`;
         examples += `GROUP BY ${groupByColumn}\n`;
         examples += `ORDER BY Count DESC;\n`;
-        examples += '```\n`;
+        examples += '```\n';
       }
     }
   });
