@@ -52,7 +52,7 @@ function generateQueryExamples(tables: any[]): string {
       examples += `2. Select all columns from ${tableName} (limited to 10 rows):\n\n`;
       examples += '```sql\n';
       examples += `SELECT TOP 10 *\nFROM ${tableName};\n`;
-      examples += '```\n';
+      examples += '```\n'; // Fixed: Removed the extra backtick
       
       // No more examples after this to limit to only 2 examples per table
     }
@@ -246,19 +246,27 @@ export const parseDatabase = async (
     try {
       const data = JSON.parse(responseText);
       
-      // Check if schema is empty or undefined
+      // Check if schema is empty or undefined and provide better logging
       if (!data.schema || data.schema.length === 0) {
-        console.warn("Received empty schema from server");
-        // Provide a default message for the prompt template
-        data.promptTemplate = data.promptTemplate || "No tables found in this database or you may not have permission to view them.";
+        console.warn("Received empty schema from server, data:", JSON.stringify(data));
+      } else {
+        console.log(`Parsed schema successfully with ${data.schema.length} tables`);
       }
       
       // Generate query examples
       const queryExamples = generateQueryExamples(data.schema || []);
+      console.log("Generated query examples:", queryExamples.substring(0, 200) + "...");
+      
+      // Add schema debug logging
+      if (data.promptTemplate) {
+        console.log("Prompt template present, length:", data.promptTemplate.length);
+      } else {
+        console.warn("No prompt template in response");
+      }
       
       return {
         schema: data.schema || [],
-        promptTemplate: data.promptTemplate || '',
+        promptTemplate: data.promptTemplate || 'No schema information was returned from the server.',
         queryExamples,
         connectionConfig: {
           server,

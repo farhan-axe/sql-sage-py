@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, DatabaseIcon } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const Index = () => {
@@ -32,9 +32,25 @@ const Index = () => {
     }
   };
 
-  const EmptyStateContent = ({ message }: { message: string }) => (
+  const handleDatabaseConnect = (info: DatabaseInfo) => {
+    console.log("Database connected with info:", {
+      tablesCount: info.tables?.length || 0,
+      hasPromptTemplate: !!info.promptTemplate,
+      promptTemplateLength: info.promptTemplate?.length || 0,
+      hasQueryExamples: !!info.queryExamples,
+      queryExamplesLength: info.queryExamples?.length || 0
+    });
+    
+    setIsConnected(true);
+    setDatabaseInfo(info);
+  };
+
+  const EmptyStateContent = ({ message, icon = <AlertCircle className="h-12 w-12 text-gray-400 mb-4" /> }: { 
+    message: string;
+    icon?: React.ReactNode;
+  }) => (
     <div className="flex flex-col items-center justify-center h-full p-6 text-center">
-      <AlertCircle className="h-12 w-12 text-gray-400 mb-4" />
+      {icon}
       <p className="text-gray-500">{message}</p>
     </div>
   );
@@ -45,10 +61,7 @@ const Index = () => {
       <div className="w-80 bg-blue-50 p-6 shadow-lg overflow-auto">
         <h2 className="text-2xl font-semibold mb-6 text-gray-800">Database Connection</h2>
         <DatabaseConnection 
-          onConnect={(info) => {
-            setIsConnected(true);
-            setDatabaseInfo(info);
-          }}
+          onConnect={handleDatabaseConnect}
           isParsing={isParsing}
           setIsParsing={setIsParsing}
         />
@@ -65,7 +78,10 @@ const Index = () => {
                   {databaseInfo?.promptTemplate ? (
                     <pre className="text-xs whitespace-pre-wrap">{databaseInfo.promptTemplate}</pre>
                   ) : (
-                    <EmptyStateContent message="Database schema will appear here after parsing. If schema is empty, the database might not have any tables or there was an error during parsing." />
+                    <EmptyStateContent 
+                      icon={<DatabaseIcon className="h-12 w-12 text-gray-400 mb-4" />}
+                      message="Database schema will appear here after parsing. If schema is empty, the database might not have any tables or there was an error during parsing." 
+                    />
                   )}
                 </ScrollArea>
               </TabsContent>
@@ -74,7 +90,9 @@ const Index = () => {
                   {databaseInfo?.queryExamples ? (
                     <pre className="text-xs markdown-content whitespace-pre-wrap">{databaseInfo.queryExamples}</pre>
                   ) : (
-                    <EmptyStateContent message="Query examples will appear here after parsing. Examples help you understand how to query the database." />
+                    <EmptyStateContent 
+                      message="Query examples will appear here after parsing. Examples help you understand how to query the database." 
+                    />
                   )}
                 </ScrollArea>
               </TabsContent>

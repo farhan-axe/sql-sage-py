@@ -70,12 +70,22 @@ const DatabaseConnection = ({ onConnect, isParsing, setIsParsing }: DatabaseConn
     setIsParsing(true);
     setParseError(null);
     try {
+      console.log(`Starting database parsing for ${selectedDb} on ${server}`);
+      
       const parseResult = await parseDatabase(
         server,
         selectedDb,
         authType === "windows",
         authType === "sql" ? { username, password } : undefined
       );
+      
+      console.log("Parse result received:", {
+        schemaLength: parseResult.schema?.length || 0,
+        hasPromptTemplate: !!parseResult.promptTemplate,
+        promptTemplateLength: parseResult.promptTemplate?.length || 0,
+        hasQueryExamples: !!parseResult.queryExamples,
+        queryExamplesLength: parseResult.queryExamples?.length || 0
+      });
 
       if (!parseResult.schema || parseResult.schema.length === 0) {
         setParseError("No tables found in the database. The schema might be empty or not accessible.");
