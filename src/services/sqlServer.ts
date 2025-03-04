@@ -8,7 +8,73 @@ function generateQueryExamples(tables: any[]): string {
     return 'No tables available to generate examples. Please make sure the database contains tables and you have permission to access them.';
   }
   
-  let examples = '';
+  // Check if the most common tables from AdventureWorks DW are present
+  const hasCustomerTable = tables.some(t => t.name === 'DimCustomer');
+  const hasSalesTable = tables.some(t => t.name === 'FactInternetSales');
+  const hasProductTable = tables.some(t => t.name === 'DimProduct');
+  
+  // If this appears to be AdventureWorks DW, use the provided examples
+  if (hasCustomerTable && hasSalesTable) {
+    return `Below are some general examples of questions:
+
+1. Calculate me the total number of customers?,
+Your SQL Query will be like "SELECT COUNT(DISTINCT CustomerKey) FROM DimCustomer;"
+
+2. Calculate me the total number of customers who have purchased more than 5 products?,
+Your SQL Query will be like "WITH InternetSalesCTE AS (
+    SELECT CustomerKey, ProductKey
+    FROM FactInternetSales
+)
+SELECT SUM(TotalProductsPurchased) FROM (
+    SELECT CustomerKey, COUNT(DISTINCT ProductKey) AS TotalProductsPurchased
+    FROM InternetSalesCTE
+    GROUP BY CustomerKey
+    HAVING COUNT(DISTINCT ProductKey) > 5
+) x;"
+
+3. Provide me the list of customers who have purchased more than 5 products?,
+Your SQL Query will be like "WITH InternetSalesCTE AS (
+    SELECT CustomerKey, ProductKey
+    FROM FactInternetSales
+),
+CustomerPurchases AS (
+    SELECT CustomerKey, COUNT(DISTINCT ProductKey) AS TotalProductsPurchased
+    FROM InternetSalesCTE
+    GROUP BY CustomerKey
+    HAVING COUNT(DISTINCT ProductKey) > 5
+)
+SELECT d.CustomerKey, d.FirstName, d.LastName, cp.TotalProductsPurchased
+FROM DimCustomer d
+JOIN CustomerPurchases cp ON d.CustomerKey = cp.CustomerKey;"
+
+4. Provide me the top 3 customers with their products and sales?,
+Your SQL Query will be like "WITH TopCustomers AS (
+    SELECT TOP 3 CustomerKey, SUM(SalesAmount) AS TotalSales
+    FROM FactInternetSales
+    GROUP BY CustomerKey
+    ORDER BY TotalSales DESC
+),
+CustomerProductSales AS (
+    SELECT CustomerKey, ProductKey, SUM(SalesAmount) AS ProductSales
+    FROM FactInternetSales
+    GROUP BY CustomerKey, ProductKey
+)
+SELECT 
+    dc.CustomerKey,
+    dc.FirstName,
+    dc.LastName,
+    dp.EnglishProductName AS Product,
+    cps.ProductSales
+FROM TopCustomers tc
+JOIN DimCustomer dc ON tc.CustomerKey = dc.CustomerKey
+JOIN CustomerProductSales cps ON tc.CustomerKey = cps.CustomerKey
+JOIN DimProduct dp ON cps.ProductKey = dp.ProductKey
+ORDER BY tc.TotalSales DESC, cps.ProductSales DESC;
+"`;
+  }
+  
+  // For other databases, generate custom examples
+  let examples = 'Below are some general examples of questions:\n\n';
   
   // Map of table names to their columns
   const tableColumns: { [tableName: string]: string[] } = {};
@@ -34,31 +100,49 @@ function generateQueryExamples(tables: any[]): string {
     }
   });
   
-  // Generate examples for each table - LIMIT TO 2 EXAMPLES PER TABLE
-  Object.keys(tableColumns).forEach((tableName, index) => {
-    if (index > 0) examples += '\n\n';
-    
-    const columns = tableColumns[tableName];
-    
-    // Example 1: Count all records
-    examples += `1. Count all records in ${tableName}:\n\n`;
-    examples += '```sql\n';
-    examples += `SELECT COUNT(*) AS TotalRecords\nFROM ${tableName};\n`;
-    examples += '```\n\n';
-    
-    if (columns.length > 0) {
-      // Example 2: Select all columns with TOP instead of LIMIT
-      examples += `2. Select all columns from ${tableName} (limited to 10 rows):\n\n`;
-      examples += '```sql\n';
-      examples += `SELECT TOP 10 *\nFROM ${tableName};\n`;
-      examples += '```\n'; // Fixed: Removed the extra backtick
-      
-      // No more examples after this to limit to only 2 examples per table
-    }
-  });
+  // Sort tables by name for consistency
+  const sortedTableNames = Object.keys(tableColumns).sort();
   
-  if (examples.length === 0) {
-    return 'Could not generate examples because no table information was available.';
+  // Select 2-4 tables to generate examples with
+  const exampleTables = sortedTableNames.slice(0, Math.min(4, sortedTableNames.length));
+  
+  if (exampleTables.length === 0) {
+    return 'No tables available to generate examples. Please make sure the database contains tables and you have permission to access them.';
+  }
+  
+  // Example 1: Simple count query
+  const table1 = exampleTables[0];
+  examples += `1. Calculate me the total number of ${table1}?,\n`;
+  examples += `Your SQL Query will be like "SELECT COUNT(*) FROM ${table1};"\n\n`;
+  
+  if (exampleTables.length >= 2) {
+    // Example 2: Filtered selection query
+    const table2 = exampleTables[1];
+    const columns2 = tableColumns[table2].slice(0, 3);
+    
+    if (columns2.length > 0) {
+      examples += `2. Get me all ${table2} where ${columns2[0]} is greater than a certain value?,\n`;
+      examples += `Your SQL Query will be like "SELECT TOP 100 ${columns2.join(', ')} FROM ${table2} WHERE ${columns2[0]} > [value];"\n\n`;
+    }
+  }
+  
+  if (exampleTables.length >= 3) {
+    // Example 3: Join query
+    const table1 = exampleTables[0];
+    const table2 = exampleTables[2];
+    examples += `3. Join ${table1} with ${table2}?,\n`;
+    examples += `Your SQL Query will be like "SELECT t1.*, t2.*\nFROM ${table1} t1\nJOIN ${table2} t2 ON t1.${tableColumns[table1][0]} = t2.${tableColumns[table2][0]};"\n\n`;
+  }
+  
+  if (exampleTables.length >= 2) {
+    // Example 4: Aggregation and group by
+    const table = exampleTables[1];
+    const columns = tableColumns[table];
+    
+    if (columns.length >= 2) {
+      examples += `4. Get me the count of ${table} grouped by ${columns[0]}?,\n`;
+      examples += `Your SQL Query will be like "SELECT ${columns[0]}, COUNT(*) as Total\nFROM ${table}\nGROUP BY ${columns[0]}\nORDER BY Total DESC;"\n`;
+    }
   }
   
   return examples;
