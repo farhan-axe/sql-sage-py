@@ -112,7 +112,7 @@ export const connectToServer = async (config: {
       
       // Check if the error response contains HTML (common for 404, 500, etc.)
       if (errorText.trim().startsWith('<!DOCTYPE') || errorText.trim().startsWith('<html')) {
-        throw new Error(`Server returned HTML instead of JSON. Status: ${response.status}. Endpoint may not exist or server is misconfigured.`);
+        throw new Error(`Server returned HTML instead of JSON. Status: ${response.status}. This usually means the API endpoint doesn't exist or the server is not running correctly.`);
       }
       
       let errorDetail;
@@ -139,7 +139,10 @@ export const connectToServer = async (config: {
       return data.databases || [];
     } catch (parseError) {
       console.error("JSON parse error:", parseError);
-      throw new Error(`Failed to parse server response as JSON: ${responseText.substring(0, 100)}...`);
+      if (responseText.trim().startsWith('<!DOCTYPE') || responseText.trim().startsWith('<html')) {
+        throw new Error(`Server returned HTML instead of JSON. Please check if the API server is running correctly and configured to return JSON responses.`);
+      }
+      throw new Error(`Failed to parse server response as JSON. The server might not be returning valid JSON data.`);
     }
   } catch (error) {
     console.error('Error connecting to server:', error);
@@ -186,7 +189,7 @@ export const parseDatabase = async (
       
       // Check if the error response contains HTML
       if (errorText.trim().startsWith('<!DOCTYPE') || errorText.trim().startsWith('<html')) {
-        throw new Error(`Server returned HTML instead of JSON. Status: ${response.status}. Endpoint may not exist or server is misconfigured.`);
+        throw new Error(`Server returned HTML instead of JSON. Status: ${response.status}. This usually means the backend API is not configured correctly.`);
       }
       
       let errorDetail;
@@ -222,7 +225,10 @@ export const parseDatabase = async (
       };
     } catch (parseError) {
       console.error("JSON parse error:", parseError);
-      throw new Error(`Failed to parse server response as JSON: ${responseText.substring(0, 100)}...`);
+      if (responseText.trim().startsWith('<!DOCTYPE') || responseText.trim().startsWith('<html')) {
+        throw new Error(`Server returned HTML instead of JSON. Please check if the API server is configured correctly to return JSON responses.`);
+      }
+      throw new Error(`Failed to parse server response as JSON. Please check that the API is returning properly formatted JSON data.`);
     }
   } catch (error) {
     console.error('Error parsing database:', error);
