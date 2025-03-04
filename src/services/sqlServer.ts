@@ -1,3 +1,4 @@
+
 /**
  * Generates example SQL queries based on the database schema
  * @param tables Array of table information objects
@@ -559,6 +560,14 @@ export const isNonSqlResponse = (text: string): boolean => {
     "outside the scope"
   ];
   
+  // Add profanity and inappropriate language detection
+  const profanityWords = [
+    "fuck", "shit", "ass", "bitch", "damn", "cunt", "dick", "cock", "pussy", "whore",
+    "bastard", "asshole", "motherfucker", "bullshit", "horseshit", "douchebag",
+    "wanker", "slut", "piss", "twat", "fag", "faggot", "nigger", "nigga",
+    "prick", "bollocks"
+  ];
+  
   // Add political and general knowledge indicators
   const nonDatabaseTopics = [
     "president",
@@ -603,7 +612,20 @@ export const isNonSqlResponse = (text: string): boolean => {
     "united states",
     "europe",
     "africa",
-    "asia"
+    "asia",
+    "religion",
+    "religious",
+    "islam",
+    "muslim",
+    "christianity",
+    "christian",
+    "judaism",
+    "jewish",
+    "hindu",
+    "buddhism",
+    "buddhist",
+    "atheist",
+    "god"
   ];
   
   // Check for common question patterns that are not database-related
@@ -615,6 +637,11 @@ export const isNonSqlResponse = (text: string): boolean => {
     /how many people/i,
     /tell me about/i
   ];
+  
+  // Check for profanity
+  const hasProfanity = profanityWords.some(word => 
+    normalizedText.includes(word.toLowerCase())
+  );
   
   // Check for non-SQL indicators
   const hasNonSqlIndicator = nonSqlIndicators.some(indicator => 
@@ -648,8 +675,8 @@ export const isNonSqlResponse = (text: string): boolean => {
     return false;
   }
   
-  // Block if it matches any non-SQL indicator, topic or pattern
-  return hasNonSqlIndicator || hasNonDatabaseTopic || hasGeneralPattern;
+  // Block if it matches any non-SQL indicator, topic, pattern, or contains profanity
+  return hasNonSqlIndicator || hasNonDatabaseTopic || hasGeneralPattern || hasProfanity;
 };
 
 // Export the function for external use
