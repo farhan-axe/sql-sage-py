@@ -87,7 +87,7 @@ const Index = () => {
                   {databaseInfo?.promptTemplate ? (
                     <>
                       {isSchemaEmpty && (
-                        <Alert variant="warning" className="mb-4 bg-amber-50 border-amber-200">
+                        <Alert variant="destructive" className="mb-4 bg-amber-50 border-amber-200">
                           <AlertTriangle className="h-4 w-4 text-amber-600" />
                           <AlertTitle>No Database Schema Found</AlertTitle>
                           <AlertDescription className="text-sm">
@@ -110,7 +110,7 @@ const Index = () => {
                   {databaseInfo?.queryExamples ? (
                     <>
                       {areExamplesEmpty && (
-                        <Alert variant="warning" className="mb-4 bg-amber-50 border-amber-200">
+                        <Alert variant="destructive" className="mb-4 bg-amber-50 border-amber-200">
                           <AlertTriangle className="h-4 w-4 text-amber-600" />
                           <AlertTitle>No Query Examples Available</AlertTitle>
                           <AlertDescription className="text-sm">

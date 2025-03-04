@@ -1,4 +1,3 @@
-
 /**
  * Generates example SQL queries based on the database schema
  * @param tables Array of table information objects
@@ -242,9 +241,15 @@ export const parseDatabase = async (
     console.log("Parse database response length:", responseText.length);
     console.log("Response text preview:", responseText.substring(0, 100));
     
+    // Add more detailed logging to diagnose the issue
+    console.log("Full response from backend:", responseText);
+    
     // Try to parse the response as JSON, with better error handling
     try {
       const data = JSON.parse(responseText);
+      
+      // Add detailed logging to see what's in the parsed data
+      console.log("Parsed data from backend:", JSON.stringify(data, null, 2));
       
       // Check if schema is empty or undefined and provide better logging
       if (!data.schema || data.schema.length === 0) {
@@ -299,6 +304,7 @@ export const parseDatabase = async (
         data.promptTemplate = generatedPromptTemplate;
       }
       
+      // Return the parsed data
       return {
         schema: data.schema || [],
         promptTemplate: data.promptTemplate || 'No schema information was returned from the server.',
