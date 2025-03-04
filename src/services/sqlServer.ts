@@ -184,7 +184,7 @@ function generateQueryExamples(tables: any[]): string {
     examples += '```\n\n';
     
     if (columns.length > 0) {
-      // Example 2: Select all columns with limit
+      // Example 2: Select all columns with TOP instead of LIMIT
       examples += `2. Select all columns from ${tableName} (limited to 10 rows):\n\n`;
       examples += '```sql\n';
       examples += `SELECT TOP 10 *\nFROM ${tableName};\n`;
@@ -192,57 +192,24 @@ function generateQueryExamples(tables: any[]): string {
       
       // Example 3: Group by a column if there are enough columns
       if (columns.length >= 2) {
+        // Look for MaritalStatus first, then fall back to other categorical columns
         const groupByColumn = columns.find(col => 
-          col.toLowerCase().includes('gender') || 
+          col.toLowerCase() === 'maritalstatus'
+        ) || columns.find(col => 
           col.toLowerCase().includes('status') || 
+          col.toLowerCase().includes('gender') || 
           col.toLowerCase().includes('type') ||
           col.toLowerCase().includes('city') ||
           col.toLowerCase().includes('province')
         ) || columns[1];
         
-        const countColumn = columns[0];
-        
-        examples += `3. Count records grouped by ${groupByColumn}:\n\n`;
+        examples += `3. THIS TABLE COUNT RECORDS BY ${groupByColumn.toUpperCase()} WITH GROUPBY:\n\n`;
         examples += '```sql\n';
         examples += `SELECT ${groupByColumn}, COUNT(*) AS Count\n`;
         examples += `FROM ${tableName}\n`;
         examples += `GROUP BY ${groupByColumn}\n`;
         examples += `ORDER BY Count DESC;\n`;
-        examples += '```\n\n';
-        
-        // Example 4: Advanced query with multiple conditions
-        if (columns.length >= 3) {
-          const filterColumn = columns.find(col => 
-            col.toLowerCase().includes('age') || 
-            col.toLowerCase().includes('date') || 
-            col.toLowerCase().includes('completed')
-          ) || columns[2];
-          
-          examples += `4. Advanced query with filtering and aggregation:\n\n`;
-          examples += '```sql\n';
-          
-          if (filterColumn.toLowerCase().includes('age')) {
-            examples += `SELECT ${groupByColumn}, AVG(${filterColumn}) AS AverageAge, COUNT(*) AS Count\n`;
-            examples += `FROM ${tableName}\n`;
-            examples += `WHERE ${filterColumn} > 18\n`;
-            examples += `GROUP BY ${groupByColumn}\n`;
-            examples += `HAVING COUNT(*) > 1\n`;
-            examples += `ORDER BY Count DESC;\n`;
-          } else if (filterColumn.toLowerCase().includes('date')) {
-            examples += `SELECT ${groupByColumn}, YEAR(${filterColumn}) AS Year, COUNT(*) AS Count\n`;
-            examples += `FROM ${tableName}\n`;
-            examples += `WHERE ${filterColumn} >= '2020-01-01'\n`;
-            examples += `GROUP BY ${groupByColumn}, YEAR(${filterColumn})\n`;
-            examples += `ORDER BY Year, Count DESC;\n`;
-          } else {
-            examples += `SELECT ${groupByColumn}, MAX(${filterColumn}) AS MaxValue, COUNT(*) AS Count\n`;
-            examples += `FROM ${tableName}\n`;
-            examples += `GROUP BY ${groupByColumn}\n`;
-            examples += `ORDER BY MaxValue DESC;\n`;
-          }
-          
-          examples += '```\n';
-        }
+        examples += '```\n`;
       }
     }
   });
