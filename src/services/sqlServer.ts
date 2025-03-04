@@ -50,7 +50,7 @@ function generateQueryExamples(tables: any[]): string {
       examples += `2. Select all columns from ${tableName} (limited to 10 rows):\n\n`;
       examples += '```sql\n';
       examples += `SELECT TOP 10 *\nFROM ${tableName};\n`;
-      examples += '```\n`; // This backtick was missing proper termination
+      examples += '```\n';  // Fixed: Removed the backtick that was causing the error
       
       // No more examples after this to limit to only 2 examples per table
     }
