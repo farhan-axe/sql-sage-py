@@ -1,3 +1,4 @@
+
 /**
  * Generates example SQL queries based on the database schema
  * @param tables Array of table information objects
@@ -70,7 +71,7 @@ function generateQueryExamples(tables: any[]): string {
         examples += `FROM ${tableName}\n`;
         examples += `GROUP BY ${groupByColumn}\n`;
         examples += `ORDER BY Count DESC;\n`;
-        examples += '```\n'; // Fixed the mismatched quotes here
+        examples += '```\n';
       }
     }
   });
@@ -109,6 +110,11 @@ export const connectToServer = async (config: {
       const errorText = await response.text();
       console.error("Error response text:", errorText);
       
+      // Check if the error response contains HTML (common for 404, 500, etc.)
+      if (errorText.trim().startsWith('<!DOCTYPE') || errorText.trim().startsWith('<html')) {
+        throw new Error(`Server returned HTML instead of JSON. Status: ${response.status}. Endpoint may not exist or server is misconfigured.`);
+      }
+      
       let errorDetail;
       try {
         const errorData = JSON.parse(errorText);
@@ -127,8 +133,14 @@ export const connectToServer = async (config: {
       throw new Error('Empty response from server');
     }
     
-    const data = JSON.parse(responseText);
-    return data.databases || [];
+    // Try to parse the response as JSON, with better error handling
+    try {
+      const data = JSON.parse(responseText);
+      return data.databases || [];
+    } catch (parseError) {
+      console.error("JSON parse error:", parseError);
+      throw new Error(`Failed to parse server response as JSON: ${responseText.substring(0, 100)}...`);
+    }
   } catch (error) {
     console.error('Error connecting to server:', error);
     throw error;
@@ -170,26 +182,48 @@ export const parseDatabase = async (
     });
     
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.detail || 'Failed to parse database schema');
+      const errorText = await response.text();
+      
+      // Check if the error response contains HTML
+      if (errorText.trim().startsWith('<!DOCTYPE') || errorText.trim().startsWith('<html')) {
+        throw new Error(`Server returned HTML instead of JSON. Status: ${response.status}. Endpoint may not exist or server is misconfigured.`);
+      }
+      
+      let errorDetail;
+      try {
+        const errorData = JSON.parse(errorText);
+        errorDetail = errorData.detail || 'Failed to parse database schema';
+      } catch (e) {
+        errorDetail = 'Failed to parse database: ' + errorText;
+      }
+      
+      throw new Error(errorDetail);
     }
     
-    const data = await response.json();
-    // Generate query examples
-    const queryExamples = generateQueryExamples(data.schema);
+    const responseText = await response.text();
     
-    return {
-      schema: data.schema,
-      promptTemplate: data.promptTemplate,
-      queryExamples,
-      connectionConfig: {
-        server,
-        database,
-        useWindowsAuth,
-        ...(sqlAuth && { username: sqlAuth.username, password: sqlAuth.password })
-      },
-      tables: data.schema || [] // Use the schema as tables to match the interface
-    };
+    // Try to parse the response as JSON, with better error handling
+    try {
+      const data = JSON.parse(responseText);
+      // Generate query examples
+      const queryExamples = generateQueryExamples(data.schema || []);
+      
+      return {
+        schema: data.schema || [],
+        promptTemplate: data.promptTemplate || '',
+        queryExamples,
+        connectionConfig: {
+          server,
+          database,
+          useWindowsAuth,
+          ...(sqlAuth && { username: sqlAuth.username, password: sqlAuth.password })
+        },
+        tables: data.schema || [] // Use the schema as tables to match the interface
+      };
+    } catch (parseError) {
+      console.error("JSON parse error:", parseError);
+      throw new Error(`Failed to parse server response as JSON: ${responseText.substring(0, 100)}...`);
+    }
   } catch (error) {
     console.error('Error parsing database:', error);
     throw error;
