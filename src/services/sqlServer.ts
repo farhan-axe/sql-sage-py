@@ -249,9 +249,26 @@ export const parseDatabase = async (
       // Check if schema is empty or undefined and provide better logging
       if (!data.schema || data.schema.length === 0) {
         console.warn("Received empty schema from server, data:", JSON.stringify(data));
-      } else {
-        console.log(`Parsed schema successfully with ${data.schema.length} tables`);
+        
+        // Instead of throwing an error, we'll provide a more helpful template and examples
+        const noTablesMessage = "No tables found in the selected database. The schema might be empty or you might not have permissions to access it.";
+        const schemaPlaceholder = "## Database Schema\n\n" + noTablesMessage;
+        
+        return {
+          schema: [],
+          promptTemplate: schemaPlaceholder,
+          queryExamples: "## Example Queries\n\nNo tables available to generate examples. Please make sure the database contains tables and you have permission to access them.",
+          connectionConfig: {
+            server,
+            database,
+            useWindowsAuth,
+            ...(sqlAuth && { username: sqlAuth.username, password: sqlAuth.password })
+          },
+          tables: []
+        };
       }
+      
+      console.log(`Parsed schema successfully with ${data.schema.length} tables`);
       
       // Generate query examples
       const queryExamples = generateQueryExamples(data.schema || []);
@@ -262,6 +279,24 @@ export const parseDatabase = async (
         console.log("Prompt template present, length:", data.promptTemplate.length);
       } else {
         console.warn("No prompt template in response");
+        // Create a simple prompt template from the schema if one wasn't provided
+        let generatedPromptTemplate = "## Database Schema\n\n";
+        (data.schema || []).forEach((table: any) => {
+          if (table.name) {
+            generatedPromptTemplate += `Table: ${table.name}\n`;
+            if (table.schema && table.schema.length > 0) {
+              table.schema.forEach((column: string) => {
+                generatedPromptTemplate += `- ${column}\n`;
+              });
+            } else if (table.columnDetails && table.columnDetails.length > 0) {
+              table.columnDetails.forEach((column: any) => {
+                generatedPromptTemplate += `- ${column.name} (${column.type})\n`;
+              });
+            }
+            generatedPromptTemplate += "\n";
+          }
+        });
+        data.promptTemplate = generatedPromptTemplate;
       }
       
       return {

@@ -9,7 +9,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { connectToServer, parseDatabase } from "@/services/sqlServer";
 import type { DatabaseInfo, ConnectionConfig } from "@/types/database";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle, InfoIcon, CheckCircle2, Loader2 } from "lucide-react";
+import { AlertCircle, InfoIcon, CheckCircle2, Loader2, DatabaseIcon } from "lucide-react";
 
 interface DatabaseConnectionProps {
   onConnect: (info: DatabaseInfo) => void;
@@ -80,7 +80,7 @@ const DatabaseConnection = ({ onConnect, isParsing, setIsParsing }: DatabaseConn
       );
       
       console.log("Parse result received:", {
-        schemaLength: parseResult.schema?.length || 0,
+        tablesCount: parseResult.schema?.length || 0,
         hasPromptTemplate: !!parseResult.promptTemplate,
         promptTemplateLength: parseResult.promptTemplate?.length || 0,
         hasQueryExamples: !!parseResult.queryExamples,
@@ -89,6 +89,13 @@ const DatabaseConnection = ({ onConnect, isParsing, setIsParsing }: DatabaseConn
 
       if (!parseResult.schema || parseResult.schema.length === 0) {
         setParseError("No tables found in the database. The schema might be empty or not accessible.");
+        onConnect({
+          tables: [],
+          promptTemplate: parseResult.promptTemplate || "No database schema available.",
+          queryExamples: parseResult.queryExamples || "No query examples available.",
+          connectionConfig: parseResult.connectionConfig
+        });
+        
         toast({
           title: "Empty database schema",
           description: "No tables were found in the selected database.",

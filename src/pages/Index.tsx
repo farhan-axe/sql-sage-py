@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { AlertCircle, DatabaseIcon } from "lucide-react";
+import { AlertCircle, DatabaseIcon, AlertTriangle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const Index = () => {
@@ -45,15 +45,24 @@ const Index = () => {
     setDatabaseInfo(info);
   };
 
-  const EmptyStateContent = ({ message, icon = <AlertCircle className="h-12 w-12 text-gray-400 mb-4" /> }: { 
+  const EmptyStateContent = ({ message, icon = <AlertCircle className="h-12 w-12 text-gray-400 mb-4" />, warning = false }: { 
     message: string;
     icon?: React.ReactNode;
+    warning?: boolean;
   }) => (
     <div className="flex flex-col items-center justify-center h-full p-6 text-center">
       {icon}
-      <p className="text-gray-500">{message}</p>
+      <p className={cn("text-gray-500", warning && "text-amber-600")}>{message}</p>
     </div>
   );
+
+  const isSchemaEmpty = !databaseInfo?.promptTemplate || 
+    databaseInfo.promptTemplate.includes("No tables found") ||
+    databaseInfo.promptTemplate.includes("No schema information");
+
+  const areExamplesEmpty = !databaseInfo?.queryExamples || 
+    databaseInfo.queryExamples.includes("No tables available") ||
+    databaseInfo.queryExamples.includes("Could not generate examples");
 
   return (
     <div className="min-h-screen flex">
@@ -76,7 +85,18 @@ const Index = () => {
               <TabsContent value="schema" className="mt-2">
                 <ScrollArea className="h-[300px] rounded-md border p-4 bg-white">
                   {databaseInfo?.promptTemplate ? (
-                    <pre className="text-xs whitespace-pre-wrap">{databaseInfo.promptTemplate}</pre>
+                    <>
+                      {isSchemaEmpty && (
+                        <Alert variant="warning" className="mb-4 bg-amber-50 border-amber-200">
+                          <AlertTriangle className="h-4 w-4 text-amber-600" />
+                          <AlertTitle>No Database Schema Found</AlertTitle>
+                          <AlertDescription className="text-sm">
+                            The selected database appears to be empty or you may not have permission to access its tables.
+                          </AlertDescription>
+                        </Alert>
+                      )}
+                      <pre className="text-xs whitespace-pre-wrap">{databaseInfo.promptTemplate}</pre>
+                    </>
                   ) : (
                     <EmptyStateContent 
                       icon={<DatabaseIcon className="h-12 w-12 text-gray-400 mb-4" />}
@@ -88,7 +108,18 @@ const Index = () => {
               <TabsContent value="examples" className="mt-2">
                 <ScrollArea className="h-[300px] rounded-md border p-4 bg-white">
                   {databaseInfo?.queryExamples ? (
-                    <pre className="text-xs markdown-content whitespace-pre-wrap">{databaseInfo.queryExamples}</pre>
+                    <>
+                      {areExamplesEmpty && (
+                        <Alert variant="warning" className="mb-4 bg-amber-50 border-amber-200">
+                          <AlertTriangle className="h-4 w-4 text-amber-600" />
+                          <AlertTitle>No Query Examples Available</AlertTitle>
+                          <AlertDescription className="text-sm">
+                            Cannot generate examples for an empty database. Try selecting a database with tables.
+                          </AlertDescription>
+                        </Alert>
+                      )}
+                      <pre className="text-xs markdown-content whitespace-pre-wrap">{databaseInfo.queryExamples}</pre>
+                    </>
                   ) : (
                     <EmptyStateContent 
                       message="Query examples will appear here after parsing. Examples help you understand how to query the database." 
