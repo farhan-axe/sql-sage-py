@@ -7,6 +7,8 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { AlertCircle } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const Index = () => {
   const [isConnected, setIsConnected] = useState(false);
@@ -30,6 +32,13 @@ const Index = () => {
     }
   };
 
+  const EmptyStateContent = ({ message }: { message: string }) => (
+    <div className="flex flex-col items-center justify-center h-full p-6 text-center">
+      <AlertCircle className="h-12 w-12 text-gray-400 mb-4" />
+      <p className="text-gray-500">{message}</p>
+    </div>
+  );
+
   return (
     <div className="min-h-screen flex">
       {/* Sidebar */}
@@ -44,7 +53,7 @@ const Index = () => {
           setIsParsing={setIsParsing}
         />
 
-        {databaseInfo && (
+        {isConnected && (
           <div className="mt-6">
             <Tabs defaultValue="schema" className="w-full">
               <TabsList className="grid w-full grid-cols-2">
@@ -53,18 +62,20 @@ const Index = () => {
               </TabsList>
               <TabsContent value="schema" className="mt-2">
                 <ScrollArea className="h-[300px] rounded-md border p-4 bg-white">
-                  <pre className="text-xs whitespace-pre-wrap">{databaseInfo.promptTemplate}</pre>
+                  {databaseInfo?.promptTemplate ? (
+                    <pre className="text-xs whitespace-pre-wrap">{databaseInfo.promptTemplate}</pre>
+                  ) : (
+                    <EmptyStateContent message="Database schema will appear here after parsing. If schema is empty, the database might not have any tables or there was an error during parsing." />
+                  )}
                 </ScrollArea>
               </TabsContent>
               <TabsContent value="examples" className="mt-2">
                 <ScrollArea className="h-[300px] rounded-md border p-4 bg-white">
-                  <div className="text-xs markdown-content whitespace-pre-wrap">
-                    {databaseInfo.queryExamples ? (
-                      <pre>{databaseInfo.queryExamples}</pre>
-                    ) : (
-                      <p className="text-gray-500 italic">No examples available for this database.</p>
-                    )}
-                  </div>
+                  {databaseInfo?.queryExamples ? (
+                    <pre className="text-xs markdown-content whitespace-pre-wrap">{databaseInfo.queryExamples}</pre>
+                  ) : (
+                    <EmptyStateContent message="Query examples will appear here after parsing. Examples help you understand how to query the database." />
+                  )}
                 </ScrollArea>
               </TabsContent>
             </Tabs>

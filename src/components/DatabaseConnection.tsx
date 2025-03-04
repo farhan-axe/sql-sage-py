@@ -9,7 +9,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { connectToServer, parseDatabase } from "@/services/sqlServer";
 import type { DatabaseInfo, ConnectionConfig } from "@/types/database";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle, InfoIcon, CheckCircle2 } from "lucide-react";
+import { AlertCircle, InfoIcon, CheckCircle2, Loader2 } from "lucide-react";
 
 interface DatabaseConnectionProps {
   onConnect: (info: DatabaseInfo) => void;
@@ -28,6 +28,7 @@ const DatabaseConnection = ({ onConnect, isParsing, setIsParsing }: DatabaseConn
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [connectionSuccess, setConnectionSuccess] = useState(false);
+  const [parseError, setParseError] = useState<string | null>(null);
 
   const handleConnect = async () => {
     setIsConnecting(true);
@@ -67,7 +68,7 @@ const DatabaseConnection = ({ onConnect, isParsing, setIsParsing }: DatabaseConn
 
   const handleParseDatabase = async () => {
     setIsParsing(true);
-    setConnectionError(null);
+    setParseError(null);
     try {
       const parseResult = await parseDatabase(
         server,
@@ -76,14 +77,24 @@ const DatabaseConnection = ({ onConnect, isParsing, setIsParsing }: DatabaseConn
         authType === "sql" ? { username, password } : undefined
       );
 
-      onConnect(parseResult);
-      toast({
-        title: "Database parsed successfully",
-        description: "You can now start querying the database",
-      });
+      if (!parseResult.schema || parseResult.schema.length === 0) {
+        setParseError("No tables found in the database. The schema might be empty or not accessible.");
+        toast({
+          title: "Empty database schema",
+          description: "No tables were found in the selected database.",
+          variant: "destructive",
+        });
+      } else {
+        onConnect(parseResult);
+        toast({
+          title: "Database parsed successfully",
+          description: `Found ${parseResult.schema.length} tables in the database.`,
+        });
+      }
     } catch (error) {
       console.error('Parsing error details:', error);
-      setConnectionError(error instanceof Error ? error.message : 'Unknown parsing error');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown parsing error';
+      setParseError(errorMessage);
       toast({
         title: "Parsing failed",
         description: "Error parsing database schema",
@@ -117,6 +128,16 @@ const DatabaseConnection = ({ onConnect, isParsing, setIsParsing }: DatabaseConn
                 <p className="mt-1">The connection URL is: http://localhost:3001/api/sql/connect</p>
               </div>
             )}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {parseError && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Database parsing failed</AlertTitle>
+          <AlertDescription>
+            {parseError}
           </AlertDescription>
         </Alert>
       )}
@@ -187,7 +208,12 @@ const DatabaseConnection = ({ onConnect, isParsing, setIsParsing }: DatabaseConn
         disabled={!server || (authType === "sql" && (!username || !password)) || isConnecting}
         className="w-full"
       >
-        {isConnecting ? "Connecting..." : "Connect"}
+        {isConnecting ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Connecting...
+          </>
+        ) : "Connect"}
       </Button>
 
       {databases.length > 0 && (
@@ -213,7 +239,12 @@ const DatabaseConnection = ({ onConnect, isParsing, setIsParsing }: DatabaseConn
             disabled={!selectedDb || isParsing}
             className="w-full bg-blue-700 hover:bg-blue-800"
           >
-            {isParsing ? "Parsing Database..." : "Parse Database"}
+            {isParsing ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Parsing Database...
+              </>
+            ) : "Parse Database"}
           </Button>
         </div>
       )}

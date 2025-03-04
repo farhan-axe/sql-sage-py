@@ -5,7 +5,9 @@
  * @returns String containing example SQL queries
  */
 function generateQueryExamples(tables: any[]): string {
-  if (tables.length === 0) return '';
+  if (!tables || tables.length === 0) {
+    return 'No tables available to generate examples. Please make sure the database contains tables and you have permission to access them.';
+  }
   
   let examples = '';
   
@@ -50,11 +52,15 @@ function generateQueryExamples(tables: any[]): string {
       examples += `2. Select all columns from ${tableName} (limited to 10 rows):\n\n`;
       examples += '```sql\n';
       examples += `SELECT TOP 10 *\nFROM ${tableName};\n`;
-      examples += '```\n';  // Fixed: Removed the backtick that was causing the error
+      examples += '```\n';
       
       // No more examples after this to limit to only 2 examples per table
     }
   });
+  
+  if (examples.length === 0) {
+    return 'Could not generate examples because no table information was available.';
+  }
   
   return examples;
 }
@@ -239,6 +245,14 @@ export const parseDatabase = async (
     // Try to parse the response as JSON, with better error handling
     try {
       const data = JSON.parse(responseText);
+      
+      // Check if schema is empty or undefined
+      if (!data.schema || data.schema.length === 0) {
+        console.warn("Received empty schema from server");
+        // Provide a default message for the prompt template
+        data.promptTemplate = data.promptTemplate || "No tables found in this database or you may not have permission to view them.";
+      }
+      
       // Generate query examples
       const queryExamples = generateQueryExamples(data.schema || []);
       
