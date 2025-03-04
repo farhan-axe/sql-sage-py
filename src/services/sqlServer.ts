@@ -1,3 +1,4 @@
+
 /**
  * Generates example SQL queries based on the database schema
  * @param tables Array of table information objects
@@ -15,13 +16,25 @@ function generateQueryExamples(tables: any[]): string {
   
   // If this appears to be AdventureWorks DW, use the provided examples
   if (hasCustomerTable && hasSalesTable) {
-    return `Below are some general examples of questions:
-
-1. Calculate me the total number of customers?,
-Your SQL Query will be like "SELECT COUNT(DISTINCT CustomerKey) FROM DimCustomer;"
-
-2. Calculate me the total number of customers who have purchased more than 5 products?,
-Your SQL Query will be like "WITH InternetSalesCTE AS (
+    let examples = 'Below are some general examples of questions:\n\n';
+    
+    // First generate count examples for EACH table
+    tables.forEach((table, index) => {
+      if (table.name) {
+        // Add count example for each table
+        examples += `${index + 1}. Calculate me the total number of records in ${table.name}?,\n`;
+        examples += `Your SQL Query will be like "SELECT COUNT(*) AS TotalRecords FROM ${table.name};"\n\n`;
+      }
+    });
+    
+    // After the count examples, add the standard AdventureWorks examples
+    const startIndex = tables.length + 1;
+    
+    examples += `${startIndex}. Calculate me the total number of customers?,\n`;
+    examples += `Your SQL Query will be like "SELECT COUNT(DISTINCT CustomerKey) FROM DimCustomer;"\n\n`;
+    
+    examples += `${startIndex + 1}. Calculate me the total number of customers who have purchased more than 5 products?,\n`;
+    examples += `Your SQL Query will be like "WITH InternetSalesCTE AS (
     SELECT CustomerKey, ProductKey
     FROM FactInternetSales
 )
@@ -30,10 +43,10 @@ SELECT SUM(TotalProductsPurchased) FROM (
     FROM InternetSalesCTE
     GROUP BY CustomerKey
     HAVING COUNT(DISTINCT ProductKey) > 5
-) x;"
-
-3. Provide me the list of customers who have purchased more than 5 products?,
-Your SQL Query will be like "WITH InternetSalesCTE AS (
+) x;"\n\n`;
+    
+    examples += `${startIndex + 2}. Provide me the list of customers who have purchased more than 5 products?,\n`;
+    examples += `Your SQL Query will be like "WITH InternetSalesCTE AS (
     SELECT CustomerKey, ProductKey
     FROM FactInternetSales
 ),
@@ -45,10 +58,10 @@ CustomerPurchases AS (
 )
 SELECT d.CustomerKey, d.FirstName, d.LastName, cp.TotalProductsPurchased
 FROM DimCustomer d
-JOIN CustomerPurchases cp ON d.CustomerKey = cp.CustomerKey;"
-
-4. Provide me the top 3 customers with their products and sales?,
-Your SQL Query will be like "WITH TopCustomers AS (
+JOIN CustomerPurchases cp ON d.CustomerKey = cp.CustomerKey;"\n\n`;
+    
+    examples += `${startIndex + 3}. Provide me the top 3 customers with their products and sales?,\n`;
+    examples += `Your SQL Query will be like "WITH TopCustomers AS (
     SELECT TOP 3 CustomerKey, SUM(SalesAmount) AS TotalSales
     FROM FactInternetSales
     GROUP BY CustomerKey
@@ -69,7 +82,9 @@ FROM TopCustomers tc
 JOIN DimCustomer dc ON tc.CustomerKey = dc.CustomerKey
 JOIN CustomerProductSales cps ON tc.CustomerKey = cps.CustomerKey
 JOIN DimProduct dp ON cps.ProductKey = dp.ProductKey
-ORDER BY tc.TotalSales DESC, cps.ProductSales DESC;"`;
+ORDER BY tc.TotalSales DESC, cps.ProductSales DESC;"\n\n`;
+    
+    return examples;
   }
   
   // For other databases, generate examples for each table
@@ -83,7 +98,7 @@ ORDER BY tc.TotalSales DESC, cps.ProductSales DESC;"`;
     return 0;
   });
 
-  // First, generate count examples for each table
+  // First, generate count examples for each table using the specific format
   sortedTables.forEach((table, index) => {
     if (table.name) {
       // Add count example for each table

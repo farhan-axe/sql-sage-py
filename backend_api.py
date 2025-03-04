@@ -46,6 +46,7 @@ async def generate_query(request: QueryGenerationRequest):
 14. **Do not include ORDER BY clauses in subqueries, common table expressions, derived tables, inline functions, or views unless accompanied by TOP, OFFSET, or FOR XML, to avoid SQL Server errors.**
 15. **Always use SQL Server syntax: use TOP instead of LIMIT for row limitations.**
 16. **You MUST respond in the exact format: 'Your SQL Query will be like \"SELECT ... FROM ...\"'**
+17. **DO NOT explain your SQL query, just provide the query in the format specified.**
 
 """
 
