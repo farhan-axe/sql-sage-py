@@ -1,4 +1,3 @@
-
 /**
  * Generates example SQL queries based on the database schema
  * @param tables Array of table information objects
@@ -199,15 +198,30 @@ export const parseDatabase = async (
 
 /**
  * Terminates the current database session
+ * @param server Server name
+ * @param database Database name
+ * @param useWindowsAuth Whether to use Windows Authentication
+ * @param sqlAuth SQL Server Authentication credentials (optional)
  * @returns Promise that resolves to success status
  */
-export const terminateSession = async (): Promise<boolean> => {
+export const terminateSession = async (
+  server: string,
+  database: string,
+  useWindowsAuth: boolean,
+  sqlAuth?: { username: string; password: string }
+): Promise<boolean> => {
   try {
     const response = await fetch('/api/sql/terminate', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
+      body: JSON.stringify({
+        server,
+        database,
+        useWindowsAuth,
+        ...(sqlAuth && { username: sqlAuth.username, password: sqlAuth.password }),
+      }),
     });
     
     if (!response.ok) {
