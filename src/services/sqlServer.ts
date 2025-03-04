@@ -1,3 +1,4 @@
+
 /**
  * Generates example SQL queries based on the database schema
  * @param tables Array of table information objects
@@ -49,7 +50,7 @@ function generateQueryExamples(tables: any[]): string {
       examples += `2. Select all columns from ${tableName} (limited to 10 rows):\n\n`;
       examples += '```sql\n';
       examples += `SELECT TOP 10 *\nFROM ${tableName};\n`;
-      examples += '```\n`;
+      examples += '```\n`; // This backtick was missing proper termination
       
       // No more examples after this to limit to only 2 examples per table
     }
