@@ -554,9 +554,56 @@ export const isNonSqlResponse = (text: string): boolean => {
     "above my capabilities"
   ];
   
-  return nonSqlIndicators.some(indicator => 
+  // Add political and general knowledge indicators
+  const nonDatabaseTopics = [
+    "president",
+    "minister",
+    "government",
+    "country",
+    "politics",
+    "election",
+    "leader",
+    "nation",
+    "capital",
+    "prime minister",
+    "king",
+    "queen",
+    "mayor",
+    "governor",
+    "senator",
+    "parliament",
+    "congress",
+    "political",
+    "democracy",
+    "republican",
+    "democratic",
+    "party",
+    "vote",
+    "constitution",
+    "history",
+    "war",
+    "weather",
+    "news",
+    "sports",
+    "entertainment",
+    "celebrity",
+    "movie",
+    "music",
+    "actor",
+    "singer"
+  ];
+  
+  // Check for non-SQL indicators
+  const hasNonSqlIndicator = nonSqlIndicators.some(indicator => 
     text.toLowerCase().includes(indicator.toLowerCase())
   );
+  
+  // Check for political and general knowledge topics
+  const hasNonDatabaseTopic = nonDatabaseTopics.some(topic => 
+    text.toLowerCase().includes(topic.toLowerCase())
+  );
+  
+  return hasNonSqlIndicator || hasNonDatabaseTopic;
 };
 
 // Export the function for external use

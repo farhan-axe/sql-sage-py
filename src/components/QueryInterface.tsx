@@ -131,6 +131,7 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate }: Query
     }
 
     if (isNonSqlResponse(question)) {
+      console.log("Non-database question detected:", question);
       setQueryError("This question does not appear to be related to database content. Please ask a question about the data in your connected database.");
       toast({
         title: "Non-database question detected",
