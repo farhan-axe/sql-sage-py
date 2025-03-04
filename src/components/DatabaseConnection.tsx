@@ -9,7 +9,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { connectToServer, parseDatabase } from "@/services/sqlServer";
 import type { DatabaseInfo, ConnectionConfig } from "@/types/database";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle, InfoIcon } from "lucide-react";
+import { AlertCircle, InfoIcon, CheckCircle2 } from "lucide-react";
 
 interface DatabaseConnectionProps {
   onConnect: (info: DatabaseInfo) => void;
@@ -27,10 +27,12 @@ const DatabaseConnection = ({ onConnect, isParsing, setIsParsing }: DatabaseConn
   const [databases, setDatabases] = useState<string[]>([]);
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [connectionSuccess, setConnectionSuccess] = useState(false);
 
   const handleConnect = async () => {
     setIsConnecting(true);
     setConnectionError(null);
+    setConnectionSuccess(false);
     try {
       console.log("Starting connection with:", {
         server,
@@ -45,6 +47,7 @@ const DatabaseConnection = ({ onConnect, isParsing, setIsParsing }: DatabaseConn
       });
       
       setDatabases(dbs);
+      setConnectionSuccess(true);
       toast({
         title: "Connected successfully",
         description: "You can now select a database",
@@ -118,6 +121,16 @@ const DatabaseConnection = ({ onConnect, isParsing, setIsParsing }: DatabaseConn
         </Alert>
       )}
 
+      {connectionSuccess && !databases.length && (
+        <Alert className="bg-green-50 border-green-200">
+          <CheckCircle2 className="h-4 w-4 text-green-600" />
+          <AlertTitle>Connection Successful</AlertTitle>
+          <AlertDescription className="text-sm">
+            Loading available databases...
+          </AlertDescription>
+        </Alert>
+      )}
+
       <div className="space-y-2">
         <Label htmlFor="server">Server</Label>
         <Input
@@ -181,7 +194,7 @@ const DatabaseConnection = ({ onConnect, isParsing, setIsParsing }: DatabaseConn
         <div className="space-y-4">
           <div className="space-y-2">
             <Label>Select Database</Label>
-            <Select onValueChange={setSelectedDb}>
+            <Select onValueChange={setSelectedDb} value={selectedDb}>
               <SelectTrigger>
                 <SelectValue placeholder="Choose a database" />
               </SelectTrigger>
@@ -198,7 +211,7 @@ const DatabaseConnection = ({ onConnect, isParsing, setIsParsing }: DatabaseConn
           <Button
             onClick={handleParseDatabase}
             disabled={!selectedDb || isParsing}
-            className="w-full"
+            className="w-full bg-blue-700 hover:bg-blue-800"
           >
             {isParsing ? "Parsing Database..." : "Parse Database"}
           </Button>

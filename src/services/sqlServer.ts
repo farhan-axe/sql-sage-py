@@ -1,4 +1,3 @@
-
 /**
  * Generates example SQL queries based on the database schema
  * @param tables Array of table information objects
@@ -33,7 +32,7 @@ function generateQueryExamples(tables: any[]): string {
     }
   });
   
-  // Generate examples for each table
+  // Generate examples for each table - LIMIT TO 2 EXAMPLES PER TABLE
   Object.keys(tableColumns).forEach((tableName, index) => {
     if (index > 0) examples += '\n\n';
     
@@ -50,29 +49,9 @@ function generateQueryExamples(tables: any[]): string {
       examples += `2. Select all columns from ${tableName} (limited to 10 rows):\n\n`;
       examples += '```sql\n';
       examples += `SELECT TOP 10 *\nFROM ${tableName};\n`;
-      examples += '```\n\n';
+      examples += '```\n`;
       
-      // Example 3: Group by a column if there are enough columns
-      if (columns.length >= 2) {
-        // Look for MaritalStatus first, then fall back to other categorical columns
-        const groupByColumn = columns.find(col => 
-          col.toLowerCase() === 'maritalstatus'
-        ) || columns.find(col => 
-          col.toLowerCase().includes('status') || 
-          col.toLowerCase().includes('gender') || 
-          col.toLowerCase().includes('type') ||
-          col.toLowerCase().includes('city') ||
-          col.toLowerCase().includes('province')
-        ) || columns[1];
-        
-        examples += `3. Count records grouped by ${groupByColumn}:\n\n`;
-        examples += '```sql\n';
-        examples += `SELECT ${groupByColumn}, COUNT(*) AS Count\n`;
-        examples += `FROM ${tableName}\n`;
-        examples += `GROUP BY ${groupByColumn}\n`;
-        examples += `ORDER BY Count DESC;\n`;
-        examples += '```\n';
-      }
+      // No more examples after this to limit to only 2 examples per table
     }
   });
   
