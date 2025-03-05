@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { 
   BarChart, Bar, LineChart, Line, AreaChart, Area, 
@@ -64,26 +63,14 @@ const ChartVisualization: React.FC<ChartVisualizationProps> = ({ data }) => {
   const generateChart = () => {
     if (!xAxisField || !yAxisField) return;
 
-    // Create a copy of the data with just the fields we need
-    const rawData = data.map(item => ({
-      [xAxisField]: item[xAxisField],
-      [yAxisField]: item[yAxisField]
-    }));
-
-    setChartData(rawData);
-
-    // For pie charts, aggregate data by dimension (e.g., country)
-    if (chartType === 'pie') {
-      const aggregatedData = aggregateDataByDimension(rawData, xAxisField, yAxisField);
-      setProcessedData(aggregatedData);
-    } else {
-      setProcessedData(rawData);
-    }
-
+    // Always aggregate data by dimension for all chart types
+    const aggregatedData = aggregateDataByDimension(data, xAxisField, yAxisField);
+    setChartData(aggregatedData);
+    setProcessedData(aggregatedData);
     setIsChartGenerated(true);
   };
 
-  // Aggregate data by dimension (e.g., country)
+  // Aggregate data by dimension (e.g., country) for all chart types
   const aggregateDataByDimension = (data: any[], dimensionField: string, valueField: string) => {
     const aggregated: Record<string, number> = {};
     let total = 0;
@@ -91,6 +78,9 @@ const ChartVisualization: React.FC<ChartVisualizationProps> = ({ data }) => {
     // Sum values by dimension
     data.forEach(item => {
       const dimension = item[dimensionField];
+      // Skip if dimension is null or undefined
+      if (dimension === null || dimension === undefined) return;
+      
       const value = Number(item[valueField]) || 0;
       
       if (!aggregated[dimension]) {
@@ -101,29 +91,31 @@ const ChartVisualization: React.FC<ChartVisualizationProps> = ({ data }) => {
       total += value;
     });
 
-    // Convert to array with percentage
+    // Convert to array with percentage for all chart types
     return Object.entries(aggregated).map(([name, value]) => ({
       name,
-      value,
+      [valueField]: value,
+      value, // For pie chart compatibility
       percentage: ((value / total) * 100).toFixed(1)
     }));
   };
 
-  // Custom pie chart tooltip to show percentage
-  const CustomTooltip = ({ active, payload }: any) => {
+  // Custom tooltip for all charts to show values and percentages
+  const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
+      const dataPoint = payload[0].payload;
       return (
         <div className="bg-white p-2 border border-gray-200 shadow-sm rounded-md">
-          <p className="font-medium">{payload[0].name}</p>
-          <p>{`${yAxisField}: ${payload[0].value.toLocaleString()}`}</p>
-          <p>{`Percentage: ${payload[0].payload.percentage}%`}</p>
+          <p className="font-medium">{dataPoint.name}</p>
+          <p>{`${yAxisField}: ${Number(dataPoint[yAxisField] || dataPoint.value).toLocaleString()}`}</p>
+          <p>{`Percentage: ${dataPoint.percentage}%`}</p>
         </div>
       );
     }
     return null;
   };
 
-  // Custom pie chart label that shows percentage
+  // Custom pie chart label that shows name and percentage
   const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, index, name }: any) => {
     const RADIAN = Math.PI / 180;
     const radius = outerRadius + 25;
@@ -146,7 +138,7 @@ const ChartVisualization: React.FC<ChartVisualizationProps> = ({ data }) => {
   };
 
   const renderChart = () => {
-    if (!isChartGenerated || !chartData.length) {
+    if (!isChartGenerated || !processedData.length) {
       return (
         <div className="flex flex-col items-center justify-center h-64 bg-gray-50 rounded-md border border-dashed">
           <p className="text-gray-500 mb-2">Configure and generate chart to visualize data</p>
@@ -164,9 +156,9 @@ const ChartVisualization: React.FC<ChartVisualizationProps> = ({ data }) => {
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={processedData}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey={xAxisField} />
+                <XAxis dataKey="name" />
                 <YAxis />
-                <Tooltip />
+                <Tooltip content={<CustomTooltip />} />
                 <Legend />
                 <Bar dataKey={yAxisField} fill="#8884d8" />
               </BarChart>
@@ -177,9 +169,9 @@ const ChartVisualization: React.FC<ChartVisualizationProps> = ({ data }) => {
             <ResponsiveContainer width="100%" height={300}>
               <LineChart data={processedData}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey={xAxisField} />
+                <XAxis dataKey="name" />
                 <YAxis />
-                <Tooltip />
+                <Tooltip content={<CustomTooltip />} />
                 <Legend />
                 <Line type="monotone" dataKey={yAxisField} stroke="#8884d8" />
               </LineChart>
@@ -190,9 +182,9 @@ const ChartVisualization: React.FC<ChartVisualizationProps> = ({ data }) => {
             <ResponsiveContainer width="100%" height={300}>
               <AreaChart data={processedData}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey={xAxisField} />
+                <XAxis dataKey="name" />
                 <YAxis />
-                <Tooltip />
+                <Tooltip content={<CustomTooltip />} />
                 <Legend />
                 <Area type="monotone" dataKey={yAxisField} fill="#8884d8" stroke="#8884d8" />
               </AreaChart>
