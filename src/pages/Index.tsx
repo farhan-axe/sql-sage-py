@@ -43,6 +43,46 @@ const Index = () => {
     
     setIsConnected(true);
     setDatabaseInfo(info);
+    
+    // Load saved queries from localStorage after connection
+    loadSavedQueries(info);
+  };
+  
+  const loadSavedQueries = (info: DatabaseInfo) => {
+    try {
+      const savedQueriesKey = `savedQueries_${info.connectionConfig.server}_${info.connectionConfig.database}`;
+      const savedQueriesString = localStorage.getItem(savedQueriesKey);
+      
+      if (savedQueriesString) {
+        const savedQueries = JSON.parse(savedQueriesString);
+        console.log("Loaded saved queries from localStorage:", savedQueries.length);
+        
+        if (savedQueries.length > 0) {
+          // Format saved queries as examples and merge with existing examples
+          let formattedExamples = '';
+          
+          if (info.queryExamples && !info.queryExamples.includes("provide me list of products, sales territory")) {
+            formattedExamples = info.queryExamples;
+          }
+          
+          const startingExampleIndex = formattedExamples.split('\n\n').filter(e => e.trim()).length + 1;
+          
+          savedQueries.forEach((savedQuery: any, index: number) => {
+            const exampleNumber = startingExampleIndex + index;
+            const exampleText = `\n\n${exampleNumber}. ${savedQuery.question}?,\nYour SQL Query will be like "${savedQuery.query}"\n`;
+            formattedExamples += exampleText;
+          });
+          
+          // Update the database info with the loaded examples
+          setDatabaseInfo({
+            ...info,
+            queryExamples: formattedExamples
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Error loading saved queries:", error);
+    }
   };
 
   const handleSaveQuery = (question: string, query: string) => {

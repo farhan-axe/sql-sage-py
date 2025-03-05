@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -31,7 +30,6 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate, onSaveQ
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef<number | null>(null);
 
-  // Check for non-SQL/non-database questions before submitting
   const validateQuestion = (text: string): boolean => {
     if (!text.trim()) {
       toast({
@@ -114,19 +112,16 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate, onSaveQ
   };
 
   const extractSQLQuery = (text: string): string => {
-    // First priority: Look for the "Your SQL Query will be like" format
     const queryFormatMatch = text.match(/Your SQL Query will be like "([\s\S]*?)"/i);
     if (queryFormatMatch) {
       return queryFormatMatch[1].trim();
     }
     
-    // Second priority: Check for SQL code blocks (fallback)
     const sqlBlockMatch = text.match(/```sql\s*([\s\S]*?)\s*```/i);
     if (sqlBlockMatch) {
       return sqlBlockMatch[1].trim();
     }
 
-    // Third priority: Look for SQL keywords and extract the query (last resort)
     const sqlKeywords = ['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'WITH'];
     const lines = text.split('\n');
     const queryLines = [];
@@ -156,6 +151,30 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate, onSaveQ
     
     onSaveQuery(question, generatedQuery);
     
+    if (databaseInfo) {
+      try {
+        const savedQueriesKey = `savedQueries_${databaseInfo.connectionConfig.server}_${databaseInfo.connectionConfig.database}`;
+        const existingSavedQueries = localStorage.getItem(savedQueriesKey);
+        let savedQueries = [];
+        
+        if (existingSavedQueries) {
+          savedQueries = JSON.parse(existingSavedQueries);
+        }
+        
+        savedQueries.push({
+          question,
+          query: generatedQuery,
+          timestamp: new Date().toISOString()
+        });
+        
+        localStorage.setItem(savedQueriesKey, JSON.stringify(savedQueries));
+        
+        console.log("Query saved to localStorage:", savedQueriesKey);
+      } catch (error) {
+        console.error("Error saving query to localStorage:", error);
+      }
+    }
+    
     toast({
       title: "Query saved",
       description: "The query has been saved as an example",
@@ -171,7 +190,6 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate, onSaveQ
       return;
     }
 
-    // Move validation to before setting any state
     if (!validateQuestion(question)) {
       return;
     }
@@ -221,7 +239,6 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate, onSaveQ
       const generatedData = await generateResponse.json();
       console.log("Generated response:", generatedData.query);
       
-      // Double check the response also
       if (isNonSqlResponse(generatedData.query)) {
         console.log("Detected non-SQL response, displaying as error message");
         setQueryError("The database does not contain information to answer this question. Please try a different question about your database content.");
@@ -579,7 +596,6 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate, onSaveQ
           </h3>
           <DataDisplay data={queryResults} />
           
-          {/* Chart visualization component */}
           {queryResults.length > 0 && (
             <ChartVisualization data={queryResults} />
           )}
