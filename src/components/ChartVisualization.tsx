@@ -29,6 +29,7 @@ const ChartVisualization: React.FC<ChartVisualizationProps> = ({ data }) => {
   const [availableFields, setAvailableFields] = useState<string[]>([]);
   const [numericFields, setNumericFields] = useState<string[]>([]);
   const [chartData, setChartData] = useState<any[]>([]);
+  const [processedData, setProcessedData] = useState<any[]>([]);
   const [isChartGenerated, setIsChartGenerated] = useState(false);
 
   // Detect field types when data changes
@@ -64,13 +65,84 @@ const ChartVisualization: React.FC<ChartVisualizationProps> = ({ data }) => {
     if (!xAxisField || !yAxisField) return;
 
     // Create a copy of the data with just the fields we need
-    const processedData = data.map(item => ({
+    const rawData = data.map(item => ({
       [xAxisField]: item[xAxisField],
       [yAxisField]: item[yAxisField]
     }));
 
-    setChartData(processedData);
+    setChartData(rawData);
+
+    // For pie charts, aggregate data by dimension (e.g., country)
+    if (chartType === 'pie') {
+      const aggregatedData = aggregateDataByDimension(rawData, xAxisField, yAxisField);
+      setProcessedData(aggregatedData);
+    } else {
+      setProcessedData(rawData);
+    }
+
     setIsChartGenerated(true);
+  };
+
+  // Aggregate data by dimension (e.g., country)
+  const aggregateDataByDimension = (data: any[], dimensionField: string, valueField: string) => {
+    const aggregated: Record<string, number> = {};
+    let total = 0;
+
+    // Sum values by dimension
+    data.forEach(item => {
+      const dimension = item[dimensionField];
+      const value = Number(item[valueField]) || 0;
+      
+      if (!aggregated[dimension]) {
+        aggregated[dimension] = 0;
+      }
+      
+      aggregated[dimension] += value;
+      total += value;
+    });
+
+    // Convert to array with percentage
+    return Object.entries(aggregated).map(([name, value]) => ({
+      name,
+      value,
+      percentage: ((value / total) * 100).toFixed(1)
+    }));
+  };
+
+  // Custom pie chart tooltip to show percentage
+  const CustomTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-white p-2 border border-gray-200 shadow-sm rounded-md">
+          <p className="font-medium">{payload[0].name}</p>
+          <p>{`${yAxisField}: ${payload[0].value.toLocaleString()}`}</p>
+          <p>{`Percentage: ${payload[0].payload.percentage}%`}</p>
+        </div>
+      );
+    }
+    return null;
+  };
+
+  // Custom pie chart label that shows percentage
+  const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, index, name }: any) => {
+    const RADIAN = Math.PI / 180;
+    const radius = outerRadius + 25;
+    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
+    return (
+      <text 
+        x={x} 
+        y={y} 
+        fill={COLORS[index % COLORS.length]}
+        textAnchor={x > cx ? 'start' : 'end'} 
+        dominantBaseline="central"
+        fontSize={12}
+        fontWeight="bold"
+      >
+        {`${name} (${(percent * 100).toFixed(1)}%)`}
+      </text>
+    );
   };
 
   const renderChart = () => {
@@ -90,7 +162,7 @@ const ChartVisualization: React.FC<ChartVisualizationProps> = ({ data }) => {
         case 'bar':
           return (
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={chartData}>
+              <BarChart data={processedData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey={xAxisField} />
                 <YAxis />
@@ -103,7 +175,7 @@ const ChartVisualization: React.FC<ChartVisualizationProps> = ({ data }) => {
         case 'line':
           return (
             <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={chartData}>
+              <LineChart data={processedData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey={xAxisField} />
                 <YAxis />
@@ -116,7 +188,7 @@ const ChartVisualization: React.FC<ChartVisualizationProps> = ({ data }) => {
         case 'area':
           return (
             <ResponsiveContainer width="100%" height={300}>
-              <AreaChart data={chartData}>
+              <AreaChart data={processedData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey={xAxisField} />
                 <YAxis />
@@ -131,22 +203,21 @@ const ChartVisualization: React.FC<ChartVisualizationProps> = ({ data }) => {
             <ResponsiveContainer width="100%" height={300}>
               <PieChart>
                 <Pie
-                  data={chartData}
+                  data={processedData}
                   cx="50%"
                   cy="50%"
-                  labelLine={false}
+                  labelLine={true}
                   outerRadius={80}
                   fill="#8884d8"
-                  dataKey={yAxisField}
-                  nameKey={xAxisField}
-                  label={(entry) => entry[xAxisField]}
+                  dataKey="value"
+                  nameKey="name"
+                  label={renderCustomizedLabel}
                 >
-                  {chartData.map((entry, index) => (
+                  {processedData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip />
-                <Legend />
+                <Tooltip content={<CustomTooltip />} />
               </PieChart>
             </ResponsiveContainer>
           );
