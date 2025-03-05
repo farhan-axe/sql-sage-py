@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import DatabaseConnection from "@/components/DatabaseConnection";
 import QueryInterface from "@/components/QueryInterface";
@@ -94,8 +95,8 @@ Your SQL Query will be like "SELECT TOP 200
     st.SalesTerritoryCountry AS Country,
     SUM(f.SalesAmount) AS TotalSales
 FROM DimProduct p
-JOIN DimSalesTerritory st ON st.SalesTerritoryKey = f.SalesTerritoryKey
 JOIN FactInternetSales f ON p.ProductKey = f.ProductKey
+JOIN DimSalesTerritory st ON st.SalesTerritoryKey = f.SalesTerritoryKey
 GROUP BY p.EnglishProductName, st.SalesTerritoryCountry;"
 `;
       
