@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import DatabaseConnection from "@/components/DatabaseConnection";
 import QueryInterface from "@/components/QueryInterface";
 import { DatabaseInfo } from "@/types/database";
