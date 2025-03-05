@@ -6,16 +6,17 @@ import { useToast } from "@/components/ui/use-toast";
 import { DatabaseInfo, QueryRefinementAttempt, QueryErrorType } from "@/types/database";
 import DataDisplay from "./DataDisplay";
 import ChartVisualization from "./ChartVisualization";
-import { RotateCcw, PlayCircle, XCircle, Clock, AlertCircle } from "lucide-react";
+import { RotateCcw, PlayCircle, XCircle, Clock, AlertCircle, Save, Plus } from "lucide-react";
 import { terminateSession, isNonSqlResponse } from "@/services/sqlServer";
 
 interface QueryInterfaceProps {
   isConnected: boolean;
   databaseInfo: DatabaseInfo | null;
   onSessionTerminate: (success: boolean) => void;
+  onSaveQuery?: (question: string, query: string) => void;
 }
 
-const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate }: QueryInterfaceProps) => {
+const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate, onSaveQuery }: QueryInterfaceProps) => {
   const { toast } = useToast();
   const [question, setQuestion] = useState("");
   const [generatedQuery, setGeneratedQuery] = useState("");
@@ -148,6 +149,17 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate }: Query
     }
 
     return queryLines.join('\n').trim();
+  };
+
+  const handleSaveQuery = () => {
+    if (!question || !generatedQuery || !onSaveQuery) return;
+    
+    onSaveQuery(question, generatedQuery);
+    
+    toast({
+      title: "Query saved",
+      description: "The query has been saved as an example",
+    });
   };
 
   const handleQueryGeneration = async () => {
@@ -504,6 +516,18 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate }: Query
                 </>
               )}
             </Button>
+            
+            <Button
+              onClick={handleSaveQuery}
+              disabled={isExecuting || isGenerating || !generatedQuery}
+              variant="outline"
+              className="items-center justify-center gap-2"
+              title="Save as example query"
+            >
+              <Save size={16} />
+              Save Query
+            </Button>
+            
             {isExecuting && (
               <div className="flex items-center justify-center gap-1 px-3 bg-gray-100 rounded-md border border-gray-200">
                 <Clock size={16} className="text-gray-500" />

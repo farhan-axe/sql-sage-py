@@ -47,6 +47,7 @@ async def generate_query(request: QueryGenerationRequest):
 15. **Always use SQL Server syntax: use TOP instead of LIMIT for row limitations.**
 16. **You MUST respond in the exact format: 'Your SQL Query will be like \"SELECT ... FROM ...\"'**
 17. **DO NOT explain your SQL query, just provide the query in the format specified.**
+18. **If the question asks for products and sales territory data, ensure you join the tables correctly: DimProduct connects to FactInternetSales via ProductKey, and DimSalesTerritory connects to FactInternetSales via SalesTerritoryKey.**
 
 """
 
@@ -114,6 +115,16 @@ JOIN DimCustomer dc ON tc.CustomerKey = dc.CustomerKey
 JOIN CustomerProductSales cps ON tc.CustomerKey = cps.CustomerKey
 JOIN DimProduct dp ON cps.ProductKey = dp.ProductKey
 ORDER BY tc.TotalSales DESC, cps.ProductSales DESC;"
+
+5. provide me list of products, sales territory country name and their sales amount?,
+Your SQL Query will be like "SELECT TOP 200 
+    p.EnglishProductName AS ProductName,
+    st.SalesTerritoryCountry AS Country,
+    SUM(f.SalesAmount) AS TotalSales
+FROM DimProduct p
+JOIN FactInternetSales f ON p.ProductKey = f.ProductKey
+JOIN DimSalesTerritory st ON st.SalesTerritoryKey = f.SalesTerritoryKey
+GROUP BY p.EnglishProductName, st.SalesTerritoryCountry;"
 """}
 
 Here are the output rules:

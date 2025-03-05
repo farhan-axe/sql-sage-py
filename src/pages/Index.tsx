@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import DatabaseConnection from "@/components/DatabaseConnection";
 import QueryInterface from "@/components/QueryInterface";
@@ -45,6 +44,27 @@ const Index = () => {
     setDatabaseInfo(info);
   };
 
+  const handleSaveQuery = (question: string, query: string) => {
+    if (!databaseInfo) return;
+    
+    const newExample = `\n\n${databaseInfo.queryExamples.length > 0 ? '' : 'Below are some examples of questions:\n\n'}${databaseInfo.queryExamples.includes('1.') ? (
+      `${databaseInfo.queryExamples.split('\n\n').filter(e => e.trim()).length + 1}. ${question}?,\nYour SQL Query will be like "${query}"\n`
+    ) : (
+      `1. ${question}?,\nYour SQL Query will be like "${query}"\n`
+    )}`;
+    
+    const updatedExamples = databaseInfo.queryExamples 
+      ? `${databaseInfo.queryExamples}${newExample}` 
+      : newExample;
+    
+    setDatabaseInfo({
+      ...databaseInfo,
+      queryExamples: updatedExamples
+    });
+    
+    console.log("Updated query examples:", updatedExamples);
+  };
+
   const EmptyStateContent = ({ message, icon = <AlertCircle className="h-12 w-12 text-gray-400 mb-4" />, warning = false }: { 
     message: string;
     icon?: React.ReactNode;
@@ -64,9 +84,30 @@ const Index = () => {
     databaseInfo.queryExamples.includes("No tables available") ||
     databaseInfo.queryExamples.includes("Could not generate examples");
 
+  useEffect(() => {
+    if (databaseInfo && databaseInfo.queryExamples && !databaseInfo.queryExamples.includes("provide me list of products, sales territory")) {
+      const productSalesExample = `
+      
+${databaseInfo.queryExamples.split('\n\n').filter(e => e.trim()).length + 1}. provide me list of products, sales territory country name and their sales amount?,
+Your SQL Query will be like "SELECT TOP 200 
+    p.EnglishProductName AS ProductName,
+    st.SalesTerritoryCountry AS Country,
+    SUM(f.SalesAmount) AS TotalSales
+FROM DimProduct p
+JOIN DimSalesTerritory st ON st.SalesTerritoryKey = f.SalesTerritoryKey
+JOIN FactInternetSales f ON p.ProductKey = f.ProductKey
+GROUP BY p.EnglishProductName, st.SalesTerritoryCountry;"
+`;
+      
+      setDatabaseInfo({
+        ...databaseInfo,
+        queryExamples: databaseInfo.queryExamples + productSalesExample
+      });
+    }
+  }, [databaseInfo]);
+
   return (
     <div className="min-h-screen flex">
-      {/* Sidebar */}
       <div className="w-80 bg-blue-50 p-6 shadow-lg overflow-auto">
         <h2 className="text-2xl font-semibold mb-6 text-gray-800">Database Connection</h2>
         <DatabaseConnection 
@@ -132,12 +173,12 @@ const Index = () => {
         )}
       </div>
 
-      {/* Main Content */}
       <div className="flex-1 p-6">
         <QueryInterface 
           isConnected={isConnected}
           databaseInfo={databaseInfo}
           onSessionTerminate={handleSessionTermination}
+          onSaveQuery={handleSaveQuery}
         />
       </div>
     </div>

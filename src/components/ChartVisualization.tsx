@@ -1,132 +1,238 @@
 
-import { useState, useMemo } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import React, { useState, useEffect } from 'react';
+import { 
+  BarChart, Bar, LineChart, Line, AreaChart, Area, 
+  PieChart, Pie, Cell,
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
+} from 'recharts';
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { BarChart, Bar, LineChart, Line, PieChart, Pie, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from "recharts";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertTriangle } from "lucide-react";
+import { ArrowRight, BarChart2, LineChart as LineChartIcon, PieChart as PieChartIcon, Activity } from "lucide-react";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 
-interface ChartVisualizationProps {
+type ChartVisualizationProps = {
   data: any[];
-}
+};
 
-// Define a set of pleasant colors for charts
-const CHART_COLORS = [
-  "#8884d8", "#82ca9d", "#ffc658", "#ff8042", "#0088FE", "#00C49F", 
-  "#FFBB28", "#FF8042", "#a4de6c", "#d0ed57", "#83a6ed", "#8dd1e1"
-];
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#ffc658', '#8dd1e1'];
 
-const ChartVisualization = ({ data }: ChartVisualizationProps) => {
-  const [chartType, setChartType] = useState<string>("bar");
-  const [xAxisKey, setXAxisKey] = useState<string>("");
-  const [yAxisKey, setYAxisKey] = useState<string>("");
-  const [showChart, setShowChart] = useState<boolean>(false);
+const ChartVisualization: React.FC<ChartVisualizationProps> = ({ data }) => {
+  const [chartType, setChartType] = useState<'bar' | 'line' | 'area' | 'pie'>('bar');
+  const [xAxisField, setXAxisField] = useState<string>('');
+  const [yAxisField, setYAxisField] = useState<string>('');
+  const [availableFields, setAvailableFields] = useState<string[]>([]);
+  const [numericFields, setNumericFields] = useState<string[]>([]);
+  const [chartData, setChartData] = useState<any[]>([]);
+  const [isChartGenerated, setIsChartGenerated] = useState(false);
 
-  // Extract available data keys (columns)
-  const availableKeys = useMemo(() => {
-    if (!data || data.length === 0) return [];
-    return Object.keys(data[0]);
-  }, [data]);
+  // Detect field types when data changes
+  useEffect(() => {
+    if (data && data.length > 0) {
+      const firstRow = data[0];
+      const fields: string[] = [];
+      const numerics: string[] = [];
 
-  // Determine the appropriate data keys based on their values
-  const getAppropriateDataKeys = useMemo(() => {
-    if (!data || data.length === 0) return { numeric: [], categorical: [] };
-    
-    const numericKeys: string[] = [];
-    const categoricalKeys: string[] = [];
-    
-    // Analyze the first row to find numeric and non-numeric columns
-    Object.entries(data[0]).forEach(([key, value]) => {
-      if (typeof value === 'number') {
-        numericKeys.push(key);
-      } else {
-        categoricalKeys.push(key);
+      // Get all field names and identify numeric fields
+      Object.entries(firstRow).forEach(([key, value]) => {
+        fields.push(key);
+        if (typeof value === 'number') {
+          numerics.push(key);
+        }
+      });
+
+      setAvailableFields(fields);
+      setNumericFields(numerics);
+
+      // Set defaults
+      if (fields.length > 0 && fields[0] !== xAxisField) {
+        setXAxisField(fields[0]);
       }
-    });
-    
-    return { numeric: numericKeys, categorical: categoricalKeys };
+      
+      if (numerics.length > 0 && numerics[0] !== yAxisField) {
+        setYAxisField(numerics[0]);
+      }
+    }
   }, [data]);
 
-  // Set default axis keys when data changes
-  useMemo(() => {
-    if (getAppropriateDataKeys.categorical.length > 0 && getAppropriateDataKeys.numeric.length > 0) {
-      setXAxisKey(getAppropriateDataKeys.categorical[0]);
-      setYAxisKey(getAppropriateDataKeys.numeric[0]);
-    }
-  }, [getAppropriateDataKeys]);
+  const generateChart = () => {
+    if (!xAxisField || !yAxisField) return;
 
-  const handleGenerateChart = () => {
-    if (xAxisKey && yAxisKey) {
-      setShowChart(true);
-    }
+    // Create a copy of the data with just the fields we need
+    const processedData = data.map(item => ({
+      [xAxisField]: item[xAxisField],
+      [yAxisField]: item[yAxisField]
+    }));
+
+    setChartData(processedData);
+    setIsChartGenerated(true);
   };
 
-  // Calculate data for pie chart (aggregating by xAxisKey if needed)
-  const getPieChartData = useMemo(() => {
-    if (!data || data.length === 0 || !xAxisKey || !yAxisKey) return [];
-    
-    // Group by xAxisKey and sum yAxisKey values
-    const aggregatedData = data.reduce((acc, curr) => {
-      const key = curr[xAxisKey];
-      if (!acc[key]) {
-        acc[key] = { name: key, value: 0 };
-      }
-      acc[key].value += Number(curr[yAxisKey]) || 0;
-      return acc;
-    }, {});
-    
-    return Object.values(aggregatedData);
-  }, [data, xAxisKey, yAxisKey]);
-
-  // Check if data is suitable for selected chart
-  const isDataSuitable = useMemo(() => {
-    if (!data || data.length === 0 || !xAxisKey || !yAxisKey) return false;
-    
-    // For pie charts, we need numeric values for the yAxisKey
-    if (chartType === 'pie' && !getAppropriateDataKeys.numeric.includes(yAxisKey)) {
-      return false;
+  const renderChart = () => {
+    if (!isChartGenerated || !chartData.length) {
+      return (
+        <div className="flex flex-col items-center justify-center h-64 bg-gray-50 rounded-md border border-dashed">
+          <p className="text-gray-500 mb-2">Configure and generate chart to visualize data</p>
+          <Button onClick={generateChart} className="mt-2">
+            Generate Chart
+          </Button>
+        </div>
+      );
     }
-    
-    return true;
-  }, [data, xAxisKey, yAxisKey, chartType, getAppropriateDataKeys]);
 
-  if (!data || data.length === 0) {
-    return null;
-  }
+    const renderChartContent = () => {
+      switch (chartType) {
+        case 'bar':
+          return (
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey={xAxisField} />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey={yAxisField} fill="#8884d8" />
+              </BarChart>
+            </ResponsiveContainer>
+          );
+        case 'line':
+          return (
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey={xAxisField} />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Line type="monotone" dataKey={yAxisField} stroke="#8884d8" />
+              </LineChart>
+            </ResponsiveContainer>
+          );
+        case 'area':
+          return (
+            <ResponsiveContainer width="100%" height={300}>
+              <AreaChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey={xAxisField} />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Area type="monotone" dataKey={yAxisField} fill="#8884d8" stroke="#8884d8" />
+              </AreaChart>
+            </ResponsiveContainer>
+          );
+        case 'pie':
+          return (
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={chartData}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  outerRadius={80}
+                  fill="#8884d8"
+                  dataKey={yAxisField}
+                  nameKey={xAxisField}
+                  label={(entry) => entry[xAxisField]}
+                >
+                  {chartData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          );
+        default:
+          return null;
+      }
+    };
+
+    return renderChartContent();
+  };
+
+  const chartTypeIcons = {
+    bar: <BarChart2 size={16} />,
+    line: <LineChartIcon size={16} />,
+    area: <Activity size={16} />,
+    pie: <PieChartIcon size={16} />
+  };
 
   return (
     <Card className="mt-6">
       <CardHeader>
-        <CardTitle>Chart Visualization</CardTitle>
+        <CardTitle className="text-lg flex items-center gap-2">
+          Data Visualization
+        </CardTitle>
+        <CardDescription>
+          Visualize your query results in different chart formats
+        </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
           <div>
-            <label className="text-sm font-medium mb-1 block">Chart Type</label>
-            <Select value={chartType} onValueChange={setChartType}>
+            <label className="text-sm font-medium text-gray-700 mb-1 block">Chart Type</label>
+            <Select
+              value={chartType}
+              onValueChange={(value) => setChartType(value as any)}
+            >
               <SelectTrigger>
-                <SelectValue placeholder="Select chart type" />
+                <SelectValue>
+                  <div className="flex items-center gap-2">
+                    {chartTypeIcons[chartType]}
+                    <span>{chartType.charAt(0).toUpperCase() + chartType.slice(1)} Chart</span>
+                  </div>
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="bar">Bar Chart</SelectItem>
-                <SelectItem value="line">Line Chart</SelectItem>
-                <SelectItem value="area">Area Chart</SelectItem>
-                <SelectItem value="pie">Pie Chart</SelectItem>
+                <SelectItem value="bar">
+                  <div className="flex items-center gap-2">
+                    <BarChart2 size={16} />
+                    <span>Bar Chart</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="line">
+                  <div className="flex items-center gap-2">
+                    <LineChartIcon size={16} />
+                    <span>Line Chart</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="area">
+                  <div className="flex items-center gap-2">
+                    <Activity size={16} />
+                    <span>Area Chart</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="pie">
+                  <div className="flex items-center gap-2">
+                    <PieChartIcon size={16} />
+                    <span>Pie Chart</span>
+                  </div>
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
           
           <div>
-            <label className="text-sm font-medium mb-1 block">X-Axis / Category</label>
-            <Select value={xAxisKey} onValueChange={setXAxisKey}>
+            <label className="text-sm font-medium text-gray-700 mb-1 block">X-Axis Field</label>
+            <Select
+              value={xAxisField}
+              onValueChange={setXAxisField}
+            >
               <SelectTrigger>
-                <SelectValue placeholder="Select X-Axis" />
+                <SelectValue placeholder="Select field" />
               </SelectTrigger>
               <SelectContent>
-                {availableKeys.map((key) => (
-                  <SelectItem key={key} value={key}>
-                    {key}
+                {availableFields.map((field) => (
+                  <SelectItem key={field} value={field}>
+                    {field}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -134,99 +240,33 @@ const ChartVisualization = ({ data }: ChartVisualizationProps) => {
           </div>
           
           <div>
-            <label className="text-sm font-medium mb-1 block">Y-Axis / Value</label>
-            <Select value={yAxisKey} onValueChange={setYAxisKey}>
+            <label className="text-sm font-medium text-gray-700 mb-1 block">Y-Axis Field (Value)</label>
+            <Select
+              value={yAxisField}
+              onValueChange={setYAxisField}
+            >
               <SelectTrigger>
-                <SelectValue placeholder="Select Y-Axis" />
+                <SelectValue placeholder="Select field" />
               </SelectTrigger>
               <SelectContent>
-                {getAppropriateDataKeys.numeric.map((key) => (
-                  <SelectItem key={key} value={key}>
-                    {key}
+                {numericFields.map((field) => (
+                  <SelectItem key={field} value={field}>
+                    {field}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+          </div>
+          
+          <div className="flex items-end">
+            <Button onClick={generateChart} className="w-full">
+              <ArrowRight size={16} className="mr-2" />
+              Generate Chart
+            </Button>
           </div>
         </div>
         
-        <Button 
-          onClick={handleGenerateChart} 
-          className="w-full mb-4"
-          disabled={!xAxisKey || !yAxisKey}
-        >
-          Generate Chart
-        </Button>
-        
-        {!isDataSuitable && (
-          <Alert variant="destructive" className="mb-4">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>
-              The selected data may not be suitable for this chart type. Please select a numeric column for the Y-axis.
-            </AlertDescription>
-          </Alert>
-        )}
-        
-        {showChart && isDataSuitable && (
-          <div className="h-[400px] mt-4">
-            <ResponsiveContainer width="100%" height="100%">
-              {chartType === "bar" && (
-                <BarChart data={data}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey={xAxisKey} />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Bar dataKey={yAxisKey} fill="#8884d8" />
-                </BarChart>
-              )}
-              
-              {chartType === "line" && (
-                <LineChart data={data}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey={xAxisKey} />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Line type="monotone" dataKey={yAxisKey} stroke="#8884d8" activeDot={{ r: 8 }} />
-                </LineChart>
-              )}
-              
-              {chartType === "area" && (
-                <AreaChart data={data}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey={xAxisKey} />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Area type="monotone" dataKey={yAxisKey} fill="#8884d8" stroke="#8884d8" />
-                </AreaChart>
-              )}
-              
-              {chartType === "pie" && (
-                <PieChart>
-                  <Pie
-                    data={getPieChartData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={true}
-                    outerRadius={120}
-                    fill="#8884d8"
-                    dataKey="value"
-                    nameKey="name"
-                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                  >
-                    {getPieChartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value) => [`${value}`, yAxisKey]} />
-                  <Legend />
-                </PieChart>
-              )}
-            </ResponsiveContainer>
-          </div>
-        )}
+        {renderChart()}
       </CardContent>
     </Card>
   );
