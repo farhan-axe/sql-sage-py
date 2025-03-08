@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -117,8 +118,8 @@ const DatabaseConnection = ({ onConnect, isParsing, setIsParsing }: DatabaseConn
   };
 
   const parseSelectedDatabases = async () => {
-    const selectedDbs = selectedDbs.filter(db => db.selected && !db.parsed);
-    if (selectedDbs.length === 0) {
+    const selectedDatabases = selectedDbs.filter(db => db.selected && !db.parsed);
+    if (selectedDatabases.length === 0) {
       toast({
         title: "No databases selected",
         description: "Please select at least one database to parse",
@@ -128,19 +129,19 @@ const DatabaseConnection = ({ onConnect, isParsing, setIsParsing }: DatabaseConn
     }
 
     setIsParsing(true);
-    setParsingDatabases(new Set(selectedDbs.map(db => db.database)));
+    setParsingDatabases(new Set(selectedDatabases.map(db => db.database)));
     setParseError(null);
 
     try {
-      console.log(`Starting parallel parsing for ${selectedDbs.length} databases`);
+      console.log(`Starting parallel parsing for ${selectedDatabases.length} databases`);
       
       setSelectedDbs(prev => prev.map(db => 
-        selectedDbs.some(selected => selected.database === db.database) 
+        selectedDatabases.some(selected => selected.database === db.database) 
           ? { ...db, parsing: true } 
           : db
       ));
 
-      const parsePromises = selectedDbs.map(db => 
+      const parsePromises = selectedDatabases.map(db => 
         parseDatabase(
           server,
           db.database,
@@ -151,10 +152,10 @@ const DatabaseConnection = ({ onConnect, isParsing, setIsParsing }: DatabaseConn
 
       const results = await Promise.all(parsePromises);
       
-      const mergedInfo = mergeSchemaResults(results, selectedDbs.map(db => db.database));
+      const mergedInfo = mergeSchemaResults(results, selectedDatabases.map(db => db.database));
       
       setSelectedDbs(prev => prev.map(db => 
-        selectedDbs.some(selected => selected.database === db.database) 
+        selectedDatabases.some(selected => selected.database === db.database) 
           ? { ...db, parsed: true, parsing: false } 
           : db
       ));
@@ -172,7 +173,7 @@ const DatabaseConnection = ({ onConnect, isParsing, setIsParsing }: DatabaseConn
         onConnect(mergedInfo);
         toast({
           title: "Databases parsed successfully",
-          description: `Found ${mergedInfo.tables.length} tables across ${selectedDbs.length} databases.`,
+          description: `Found ${mergedInfo.tables.length} tables across ${selectedDatabases.length} databases.`,
         });
       }
       
