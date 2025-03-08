@@ -1,3 +1,4 @@
+
 import os
 import sys
 import shutil
@@ -352,7 +353,7 @@ def run_backend():
 """
 
     # Add the rest of the run_backend function
-    launcher_content += """
+    launcher_content += """    \"\"\"Run the backend server using the found Python executable.\"\"\"
     # Get the directory where this script is located
     script_dir = os.path.dirname(os.path.abspath(__file__))
     
@@ -541,6 +542,15 @@ def run_backend():
 
 if __name__ == "__main__":
     run_backend()
+"""
+    
+    # Write the backend launcher script
+    with open(backend_launcher, 'w') as f:
+        f.write(launcher_content)
+    
+    print(f"Created backend launcher script: {backend_launcher}")
+    
+    return backend_dir
 
 if __name__ == "__main__":
     build_backend()
