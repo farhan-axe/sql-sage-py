@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import DatabaseConnection from "@/components/DatabaseConnection";
 import QueryInterface from "@/components/QueryInterface";
@@ -158,12 +159,12 @@ const Index = () => {
           const updatedExamples = databaseInfo.queryExamples.replace(
             /(57\. provide me list of products, sales territory country name and their sales amount\?,\s+Your SQL Query will be like "SELECT TOP 200\s+p\.EnglishProductName AS ProductName,\s+st\.SalesTerritoryCountry AS Country,\s+SUM\(f\.SalesAmount\) AS TotalSales\s+FROM \[)([^\]]+)(\]\.\[dbo\]\.\[DimProduct\] p\s+JOIN \[)([^\]]+)(\]\.\[dbo\]\.\[FactInternetSales\] f ON p\.ProductKey = f\.ProductKey\s+JOIN \[)([^\]]+)(\]\.\[dbo\]\.\[DimSalesTerritory\] st ON st\.SalesTerritoryKey = f\.SalesTerritoryKey\s+GROUP BY p\.EnglishProductName, st\.SalesTerritoryCountry;)/g,
             (match, prefix, db1, middle1, db2, middle2, db3, suffix) => {
-              return `${prefix}${dbName}${middle1}${dbName}${middle2}${dbName}${suffix}`;
+              return `${prefix}AdventureWorksDW2017${middle1}AdventureWorksDW2017${middle2}AdventureWorksDW2017${suffix}`;
             }
           );
           
           if (updatedExamples !== databaseInfo.queryExamples) {
-            console.log("Updated question 57 with correct database name:", dbName);
+            console.log("Updated question 57 with database name: AdventureWorksDW2017");
             setDatabaseInfo({
               ...databaseInfo,
               queryExamples: updatedExamples
@@ -177,9 +178,9 @@ Your SQL Query will be like "SELECT TOP 200
     p.EnglishProductName AS ProductName,
     st.SalesTerritoryCountry AS Country,
     SUM(f.SalesAmount) AS TotalSales
-FROM [${dbName}].[dbo].[DimProduct] p
-JOIN [${dbName}].[dbo].[FactInternetSales] f ON p.ProductKey = f.ProductKey
-JOIN [${dbName}].[dbo].[DimSalesTerritory] st ON st.SalesTerritoryKey = f.SalesTerritoryKey
+FROM [AdventureWorksDW2017].[dbo].[DimProduct] p
+JOIN [AdventureWorksDW2017].[dbo].[FactInternetSales] f ON p.ProductKey = f.ProductKey
+JOIN [AdventureWorksDW2017].[dbo].[DimSalesTerritory] st ON st.SalesTerritoryKey = f.SalesTerritoryKey
 GROUP BY p.EnglishProductName, st.SalesTerritoryCountry;"
 `;
           
