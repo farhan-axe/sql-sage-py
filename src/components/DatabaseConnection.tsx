@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +23,7 @@ interface DatabaseSelection {
   database: string;
   parsed: boolean;
   selected: boolean;
+  parsing?: boolean;
 }
 
 const DatabaseConnection = ({ onConnect, isParsing, setIsParsing }: DatabaseConnectionProps) => {
@@ -38,6 +38,8 @@ const DatabaseConnection = ({ onConnect, isParsing, setIsParsing }: DatabaseConn
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [connectionSuccess, setConnectionSuccess] = useState(false);
   const [parseError, setParseError] = useState<string | null>(null);
+  const [parsingDatabases, setParsingDatabases] = useState<Set<string>>(new Set());
+  const [mergedSchemaInfo, setMergedSchemaInfo] = useState<DatabaseInfo | null>(null);
 
   const handleConnect = async () => {
     setIsConnecting(true);
@@ -81,28 +83,23 @@ const DatabaseConnection = ({ onConnect, isParsing, setIsParsing }: DatabaseConn
       const existingDb = prevDbs.find(db => db.database === dbName);
       
       if (existingDb) {
-        // If already in list, toggle selection
         return prevDbs.map(db => 
           db.database === dbName ? { ...db, selected: !db.selected } : db
         );
       } else {
-        // If not in list, add it as selected
         return [...prevDbs, { database: dbName, parsed: false, selected: true }];
       }
     });
   };
 
   const toggleSelectAll = () => {
-    // Check if all databases are already selected
     const allSelected = databases.every(db => 
       selectedDbs.some(selected => selected.database === db && selected.selected)
     );
     
     if (allSelected) {
-      // Deselect all
       setSelectedDbs(prevDbs => prevDbs.map(db => ({ ...db, selected: false })));
     } else {
-      // Select all
       const currentDbs = [...selectedDbs];
       const allDbs = databases.map(db => {
         const existing = currentDbs.find(d => d.database === db);
@@ -119,11 +116,131 @@ const DatabaseConnection = ({ onConnect, isParsing, setIsParsing }: DatabaseConn
     setSelectedDbs(selectedDbs.filter(db => db.database !== dbName));
   };
 
+  const parseSelectedDatabases = async () => {
+    const selectedDbs = selectedDbs.filter(db => db.selected && !db.parsed);
+    if (selectedDbs.length === 0) {
+      toast({
+        title: "No databases selected",
+        description: "Please select at least one database to parse",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsParsing(true);
+    setParsingDatabases(new Set(selectedDbs.map(db => db.database)));
+    setParseError(null);
+
+    try {
+      console.log(`Starting parallel parsing for ${selectedDbs.length} databases`);
+      
+      setSelectedDbs(prev => prev.map(db => 
+        selectedDbs.some(selected => selected.database === db.database) 
+          ? { ...db, parsing: true } 
+          : db
+      ));
+
+      const parsePromises = selectedDbs.map(db => 
+        parseDatabase(
+          server,
+          db.database,
+          authType === "windows",
+          authType === "sql" ? { username, password } : undefined
+        )
+      );
+
+      const results = await Promise.all(parsePromises);
+      
+      const mergedInfo = mergeSchemaResults(results, selectedDbs.map(db => db.database));
+      
+      setSelectedDbs(prev => prev.map(db => 
+        selectedDbs.some(selected => selected.database === db.database) 
+          ? { ...db, parsed: true, parsing: false } 
+          : db
+      ));
+      
+      setParsingDatabases(new Set());
+      
+      if (!mergedInfo.tables || mergedInfo.tables.length === 0) {
+        setParseError("No tables found in the selected databases. The schemas might be empty or not accessible.");
+        toast({
+          title: "Empty database schemas",
+          description: "No tables were found in the selected databases.",
+          variant: "destructive",
+        });
+      } else {
+        onConnect(mergedInfo);
+        toast({
+          title: "Databases parsed successfully",
+          description: `Found ${mergedInfo.tables.length} tables across ${selectedDbs.length} databases.`,
+        });
+      }
+      
+      setMergedSchemaInfo(mergedInfo);
+    } catch (error) {
+      console.error('Parsing error details:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown parsing error';
+      setParseError(errorMessage);
+      toast({
+        title: "Parsing failed",
+        description: "Error parsing database schemas",
+        variant: "destructive",
+      });
+    } finally {
+      setIsParsing(false);
+      setParsingDatabases(new Set());
+    }
+  };
+
+  const mergeSchemaResults = (results: DatabaseInfo[], dbNames: string[]): DatabaseInfo => {
+    if (results.length === 1) return results[0];
+    
+    let allTables: any[] = [];
+    let mergedPromptTemplate = "Database Schema Information:\n\n";
+    let mergedQueryExamples = "";
+    
+    results.forEach((result, index) => {
+      const dbName = dbNames[index];
+      
+      if (result.tables && result.tables.length > 0) {
+        const tablesWithDbPrefix = result.tables.map(table => ({
+          ...table,
+          name: `[${dbName}].[${table.name}]`,
+        }));
+        
+        allTables = [...allTables, ...tablesWithDbPrefix];
+      }
+      
+      if (result.promptTemplate) {
+        mergedPromptTemplate += `\n--- Database: ${dbName} ---\n${result.promptTemplate}\n`;
+      }
+      
+      if (result.queryExamples && !result.queryExamples.includes("No tables available")) {
+        mergedQueryExamples += result.queryExamples + "\n\n";
+      }
+    });
+    
+    const connectionConfig = results[0].connectionConfig;
+    
+    return {
+      tables: allTables,
+      promptTemplate: mergedPromptTemplate,
+      queryExamples: mergedQueryExamples || "No query examples available for the selected databases.",
+      connectionConfig
+    };
+  };
+
   const handleParseDatabase = async (dbName: string) => {
     setIsParsing(true);
+    setParsingDatabases(new Set([dbName]));
     setParseError(null);
+    
     try {
       console.log(`Starting database parsing for ${dbName} on ${server}`);
+      
+      setSelectedDbs(prev => prev.map(db => 
+        db.database === dbName ? { ...db, parsing: true } : db
+      ));
       
       const parseResult = await parseDatabase(
         server,
@@ -132,20 +249,13 @@ const DatabaseConnection = ({ onConnect, isParsing, setIsParsing }: DatabaseConn
         authType === "sql" ? { username, password } : undefined
       );
       
-      console.log("Parse result received:", {
-        tablesCount: parseResult.schema?.length || 0,
-        hasPromptTemplate: !!parseResult.promptTemplate,
-        promptTemplateLength: parseResult.promptTemplate?.length || 0,
-        hasQueryExamples: !!parseResult.queryExamples,
-        queryExamplesLength: parseResult.queryExamples?.length || 0
-      });
-
-      // Mark this database as parsed
       setSelectedDbs(prev => prev.map(db => 
-        db.database === dbName ? { ...db, parsed: true } : db
+        db.database === dbName ? { ...db, parsed: true, parsing: false } : db
       ));
-
-      if (!parseResult.schema || parseResult.schema.length === 0) {
+      
+      setParsingDatabases(new Set());
+      
+      if (!parseResult.tables || parseResult.tables.length === 0) {
         setParseError("No tables found in the database. The schema might be empty or not accessible.");
         onConnect({
           tables: [],
@@ -163,7 +273,7 @@ const DatabaseConnection = ({ onConnect, isParsing, setIsParsing }: DatabaseConn
         onConnect(parseResult);
         toast({
           title: "Database parsed successfully",
-          description: `Found ${parseResult.schema.length} tables in the database.`,
+          description: `Found ${parseResult.tables.length} tables in the database.`,
         });
       }
     } catch (error) {
@@ -177,6 +287,7 @@ const DatabaseConnection = ({ onConnect, isParsing, setIsParsing }: DatabaseConn
       });
     } finally {
       setIsParsing(false);
+      setParsingDatabases(new Set());
     }
   };
 
@@ -184,6 +295,7 @@ const DatabaseConnection = ({ onConnect, isParsing, setIsParsing }: DatabaseConn
     databases.every(db => selectedDbs.some(selected => selected.database === db && selected.selected));
 
   const selectedCount = selectedDbs.filter(db => db.selected).length;
+  const selectedUnparsedCount = selectedDbs.filter(db => db.selected && !db.parsed).length;
 
   return (
     <div className="space-y-6">
@@ -320,6 +432,7 @@ const DatabaseConnection = ({ onConnect, isParsing, setIsParsing }: DatabaseConn
                       const dbSelection = selectedDbs.find(selection => selection.database === db);
                       const isSelected = dbSelection?.selected ?? false;
                       const isParsed = dbSelection?.parsed ?? false;
+                      const isParsing = parsingDatabases.has(db);
                       
                       return (
                         <div key={db} className="flex items-center justify-between py-2 px-2 hover:bg-gray-50 rounded">
@@ -328,6 +441,7 @@ const DatabaseConnection = ({ onConnect, isParsing, setIsParsing }: DatabaseConn
                               id={`db-${db}`}
                               checked={isSelected}
                               onCheckedChange={() => toggleDatabaseSelection(db)}
+                              disabled={isParsing}
                             />
                             <Label htmlFor={`db-${db}`} className="cursor-pointer flex items-center gap-2">
                               <DatabaseIcon className="h-4 w-4 text-gray-500" />
@@ -337,9 +451,15 @@ const DatabaseConnection = ({ onConnect, isParsing, setIsParsing }: DatabaseConn
                                   Parsed
                                 </Badge>
                               )}
+                              {isParsing && (
+                                <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200 text-xs ml-1">
+                                  <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                                  Parsing...
+                                </Badge>
+                              )}
                             </Label>
                           </div>
-                          {isSelected && !isParsed && (
+                          {isSelected && !isParsed && !isParsing && (
                             <Button
                               size="sm"
                               variant="outline"
@@ -347,7 +467,7 @@ const DatabaseConnection = ({ onConnect, isParsing, setIsParsing }: DatabaseConn
                               disabled={isParsing}
                               className="h-7 text-xs"
                             >
-                              {isParsing ? <Loader2 className="h-3 w-3 animate-spin" /> : "Parse"}
+                              Parse
                             </Button>
                           )}
                         </div>
@@ -359,8 +479,28 @@ const DatabaseConnection = ({ onConnect, isParsing, setIsParsing }: DatabaseConn
             </Card>
             
             {selectedCount > 0 && (
-              <div className="text-sm text-gray-500">
-                {selectedCount} database{selectedCount !== 1 ? 's' : ''} selected
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-gray-500">
+                  {selectedCount} database{selectedCount !== 1 ? 's' : ''} selected
+                </div>
+                
+                {selectedUnparsedCount > 1 && (
+                  <Button
+                    onClick={parseSelectedDatabases}
+                    disabled={isParsing || selectedUnparsedCount === 0}
+                    size="sm"
+                    className="ml-auto"
+                  >
+                    {isParsing ? (
+                      <>
+                        <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                        Parsing...
+                      </>
+                    ) : (
+                      `Parse ${selectedUnparsedCount} Databases`
+                    )}
+                  </Button>
+                )}
               </div>
             )}
           </div>

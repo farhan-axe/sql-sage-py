@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import DatabaseConnection from "@/components/DatabaseConnection";
 import QueryInterface from "@/components/QueryInterface";
@@ -107,6 +108,7 @@ const Index = () => {
   };
 
   const handleQueryGenerated = (timeInMs: number) => {
+    console.log(`Setting query generation time: ${timeInMs}ms`);
     setQueryGenerationTime(timeInMs);
   };
 
