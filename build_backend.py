@@ -89,6 +89,45 @@ def detect_conda_environment():
             print(f"Found conda Python executable: {python_exe}")
             return python_exe
     
+    # Check specifically for the 'sqlbot' environment that user mentioned
+    try:
+        # Try to detect conda environments using conda command
+        if platform.system() == "Windows":
+            conda_cmd = "conda.exe"
+        else:
+            conda_cmd = "conda"
+        
+        result = subprocess.run([conda_cmd, "env", "list"], capture_output=True, text=True)
+        if result.returncode == 0:
+            for line in result.stdout.splitlines():
+                if 'sqlbot' in line:
+                    env_path = line.split()[-1]  # Path is usually the last item
+                    if platform.system() == "Windows":
+                        python_path = os.path.join(env_path, "python.exe")
+                    else:
+                        python_path = os.path.join(env_path, "bin", "python")
+                    
+                    if os.path.exists(python_path):
+                        print(f"Found sqlbot conda environment at: {env_path}")
+                        print(f"Using Python executable: {python_path}")
+                        return python_path
+    except:
+        print("Failed to detect conda environments via conda command")
+    
+    # Try specific known paths for the sqlbot environment
+    if platform.system() == "Windows":
+        known_paths = [
+            os.path.expanduser("~/anaconda3/envs/sqlbot/python.exe"),
+            os.path.expanduser("~/miniconda3/envs/sqlbot/python.exe"),
+            "C:\\Users\\farha\\anaconda3\\envs\\sqlbot\\python.exe",  # Known path from user's environment
+            "C:\\ProgramData\\Anaconda3\\envs\\sqlbot\\python.exe",
+        ]
+        
+        for path in known_paths:
+            if os.path.exists(path):
+                print(f"Found sqlbot environment Python at: {path}")
+                return path
+    
     # If we're not in a conda environment or couldn't find the python executable
     print(f"Using system Python: {sys.executable}")
     return sys.executable
@@ -169,9 +208,24 @@ import sys
 import subprocess
 import platform
 import time
+import glob
 
 # Hard-coded python path from build time
 CONDA_PYTHON_PATH = """ + repr(python_path) + """
+
+# List of potential conda Python paths with 'sqlbot' environment
+POTENTIAL_CONDA_PATHS = [
+    os.path.expanduser("~/anaconda3/envs/sqlbot/python.exe"),
+    os.path.expanduser("~/miniconda3/envs/sqlbot/python.exe"),
+    "C:\\\\Users\\\\farha\\\\anaconda3\\\\envs\\\\sqlbot\\\\python.exe",  # Known specific user path
+    os.path.join(os.environ.get('USERPROFILE', ''), "anaconda3", "envs", "sqlbot", "python.exe"),
+    os.path.join(os.environ.get('USERPROFILE', ''), "miniconda3", "envs", "sqlbot", "python.exe"),
+] if platform.system() == "Windows" else [
+    os.path.expanduser("~/anaconda3/envs/sqlbot/bin/python"),
+    os.path.expanduser("~/miniconda3/envs/sqlbot/bin/python"),
+    "/opt/anaconda3/envs/sqlbot/bin/python",
+    "/opt/miniconda3/envs/sqlbot/bin/python",
+]
 
 def find_python_executable():
     \"\"\"Find the Python executable to use.\"\"\"
@@ -191,6 +245,28 @@ def find_python_executable():
         if os.path.exists(conda_python):
             print(f"Found conda Python: {conda_python}")
             return conda_python
+            
+    # Try to get conda environments
+    try:
+        # Try to detect conda environments using conda command
+        conda_cmd = "conda.exe" if platform.system() == "Windows" else "conda"
+        result = subprocess.run([conda_cmd, "env", "list"], capture_output=True, text=True)
+        if result.returncode == 0:
+            for line in result.stdout.splitlines():
+                if 'sqlbot' in line:
+                    env_path = line.split()[-1]  # Path is usually the last item
+                    python_path = os.path.join(env_path, "python.exe" if platform.system() == "Windows" else "bin/python")
+                    if os.path.exists(python_path):
+                        print(f"Found conda Python from env list: {python_path}")
+                        return python_path
+    except:
+        print("Failed to get conda environments via command")
+    
+    # Check our potential conda paths
+    for path in POTENTIAL_CONDA_PATHS:
+        if os.path.exists(path):
+            print(f"Found Python at preset location: {path}")
+            return path
     
     # Check common locations for Python
     if platform.system() == "Windows":
@@ -204,8 +280,6 @@ def find_python_executable():
             # Add conda paths
             os.path.expanduser(r"~\\miniconda3\\python.exe"),
             os.path.expanduser(r"~\\anaconda3\\python.exe"),
-            os.path.expanduser(r"~\\miniconda3\\envs\\sqlbot\\python.exe"),
-            os.path.expanduser(r"~\\anaconda3\\envs\\sqlbot\\python.exe"),
         ]
     else:
         common_paths = [
@@ -215,16 +289,42 @@ def find_python_executable():
             # Add conda paths
             os.path.expanduser("~/miniconda3/bin/python"),
             os.path.expanduser("~/anaconda3/bin/python"),
-            os.path.expanduser("~/miniconda3/envs/sqlbot/bin/python"),
-            os.path.expanduser("~/anaconda3/envs/sqlbot/bin/python"),
         ]
     
     for path in common_paths:
         if os.path.exists(path):
             print(f"Found Python at common location: {path}")
             return path
+            
+    # Look for Python in Program Files and other common locations
+    if platform.system() == "Windows":
+        python_glob_patterns = [
+            "C:\\\\Python*\\\\python.exe",
+            "C:\\\\Program Files\\\\Python*\\\\python.exe",
+            "C:\\\\Program Files (x86)\\\\Python*\\\\python.exe",
+            os.path.join(os.environ.get('LOCALAPPDATA', ''), "Programs", "Python", "Python*", "python.exe")
+        ]
+        
+        for pattern in python_glob_patterns:
+            matches = glob.glob(pattern)
+            if matches:
+                # Sort to get the latest version
+                matches.sort(reverse=True)
+                print(f"Found Python via glob: {matches[0]}")
+                return matches[0]
     
-    # As a last resort, use the system's python (which may fail)
+    # As a last resort, try to use the python command directly
+    try:
+        # Check if 'python' or 'python3' exists in PATH
+        cmd = "python" if platform.system() == "Windows" else "python3"
+        result = subprocess.run([cmd, "--version"], capture_output=True, text=True)
+        if result.returncode == 0:
+            print(f"Using system Python: {cmd}")
+            return cmd
+    except:
+        pass
+        
+    # Absolute last resort
     print("Using system Python as fallback")
     return "python" if platform.system() == "Windows" else "python3"
 
@@ -242,15 +342,47 @@ def run_backend():
     # Print diagnostic information
     print(f"Working directory: {os.getcwd()}")
     print(f"System platform: {platform.platform()}")
+    print(f"Python paths checked:")
+    for path in [CONDA_PYTHON_PATH] + POTENTIAL_CONDA_PATHS:
+        print(f"  - {path}: {'EXISTS' if os.path.exists(path) else 'NOT FOUND'}")
     
     # Find the python executable
     python_exe = find_python_executable()
     print(f"Using Python executable: {python_exe}")
     
+    # Create a simple test to validate Python works
+    test_script = os.path.join(script_dir, "test_python.py")
+    with open(test_script, 'w') as f:
+        f.write("print('Python test successful!')\\n")
+    
     try:
+        # Test if Python is working
+        print("Testing Python executable...")
+        try:
+            result = subprocess.run([python_exe, test_script], capture_output=True, text=True, timeout=5)
+            print(f"Python test output: {result.stdout}")
+            if result.returncode != 0:
+                print(f"Python test error: {result.stderr}")
+                print("Warning: Python test failed, but continuing anyway")
+        except Exception as e:
+            print(f"Python test error: {e}")
+            print("Warning: Python test failed, but continuing anyway")
+            # Try to find an alternative Python
+            for alt_path in POTENTIAL_CONDA_PATHS:
+                if os.path.exists(alt_path) and alt_path != python_exe:
+                    print(f"Trying alternative Python: {alt_path}")
+                    try:
+                        result = subprocess.run([alt_path, test_script], capture_output=True, text=True, timeout=5)
+                        if result.returncode == 0:
+                            print(f"Alternative Python works! Using: {alt_path}")
+                            python_exe = alt_path
+                            break
+                    except:
+                        pass
+    
         # First, check if necessary packages are installed
         print("Checking if required packages are installed...")
-        check_cmd = [python_exe, "-c", "import fastapi, uvicorn, pyodbc; print('Packages are available')"]
+        check_cmd = [python_exe, "-c", "import fastapi, uvicorn; print('Packages are available')"]
         try:
             output = subprocess.check_output(check_cmd, stderr=subprocess.STDOUT, universal_newlines=True)
             print(output)
@@ -275,14 +407,64 @@ def run_backend():
         api_routes_path = os.path.join(script_dir, "api_routes.py")
         if os.path.exists(api_routes_path):
             print(f"Starting backend using {api_routes_path}")
-            subprocess.Popen([python_exe, api_routes_path])
+            
+            # On Windows, use the appropriate method to hide the console window
+            startup_info = None
+            if platform.system() == "Windows":
+                startup_info = subprocess.STARTUPINFO()
+                startup_info.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                startup_info.wShowWindow = 0  # SW_HIDE
+            
+            process = subprocess.Popen(
+                [python_exe, api_routes_path],
+                startupinfo=startup_info,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+            )
+            
+            # Wait briefly to see if the process starts successfully
+            time.sleep(2)
+            if process.poll() is not None:
+                # Process has already terminated
+                stdout, stderr = process.communicate()
+                print(f"Backend process failed to start. Return code: {process.returncode}")
+                print(f"stdout: {stdout}")
+                print(f"stderr: {stderr}")
+            else:
+                print("Backend process started successfully")
             return
         
         # Check if sql.py exists as fallback
         sql_path = os.path.join(script_dir, "sql.py")
         if os.path.exists(sql_path):
             print(f"Starting backend using {sql_path}")
-            subprocess.Popen([python_exe, sql_path])
+            
+            # On Windows, use the appropriate method to hide the console window
+            startup_info = None
+            if platform.system() == "Windows":
+                startup_info = subprocess.STARTUPINFO()
+                startup_info.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                startup_info.wShowWindow = 0  # SW_HIDE
+            
+            process = subprocess.Popen(
+                [python_exe, sql_path],
+                startupinfo=startup_info,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+            )
+            
+            # Wait briefly to see if the process starts successfully
+            time.sleep(2)
+            if process.poll() is not None:
+                # Process has already terminated
+                stdout, stderr = process.communicate()
+                print(f"Backend process failed to start. Return code: {process.returncode}")
+                print(f"stdout: {stdout}")
+                print(f"stderr: {stderr}")
+            else:
+                print("Backend process started successfully")
             return
         
         print("ERROR: Could not find api_routes.py or sql.py. Backend cannot start.")

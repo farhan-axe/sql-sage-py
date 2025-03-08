@@ -30,18 +30,30 @@
         "filter": ["**/*"]
       }
     ],
+    "extraFiles": [
+      {
+        "from": "backend",
+        "to": "backend",
+        "filter": ["**/*"]
+      }
+    ],
     "directories": {
       "buildResources": "public",
       "output": "electron-dist"
     },
     "mac": {
-      "category": "public.app-category.developer-tools"
+      "category": "public.app-category.developer-tools",
+      "target": ["zip", "dmg"]
     },
     "win": {
-      "target": "nsis"
+      "target": ["nsis", "zip", "portable"]
     },
     "linux": {
-      "target": "AppImage"
+      "target": ["AppImage", "deb", "tar.gz"]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
     }
   }
 }

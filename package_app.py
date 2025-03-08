@@ -186,6 +186,12 @@ Before running SQL Sage, you need to install Ollama and download the required mo
    On Linux, run 'ollama serve' if it's not already running.
 
 4. You can customize the model by editing the .env file in the application directory.
+
+IMPORTANT FOR CONDA USERS:
+SQL Sage looks for a Python installation to run its backend. If you're using Conda,
+make sure your 'sqlbot' environment is activated before running SQL Sage.
+If you still encounter issues, you can edit the 'backend/run_backend.py' file
+to specify your Python executable path directly.
 """
     
     with open("OLLAMA_SETUP.txt", "w") as f:

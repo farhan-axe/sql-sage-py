@@ -15,6 +15,7 @@ print(f"System platform: {platform.platform()}")
 print(f"Current directory: {os.getcwd()}")
 print(f"PYTHONPATH: {os.environ.get('PYTHONPATH', 'Not set')}")
 print(f"PATH: {os.environ.get('PATH', 'Not set')[:200]}...") # Show first 200 chars of PATH
+print(f"Conda environment: {os.environ.get('CONDA_PREFIX', 'Not in conda')}")
 
 # Import modules with error handling
 try:
@@ -42,7 +43,73 @@ except ImportError as e:
     except ImportError as e:
         logging.error(f"Still failed to import after path fix: {e}")
         traceback.print_exc()
-        raise
+        
+        # Create placeholder modules if needed
+        if not os.path.exists(os.path.join(current_dir, "models.py")):
+            print("Creating placeholder models.py")
+            with open(os.path.join(current_dir, "models.py"), "w") as f:
+                f.write("""
+from pydantic import BaseModel
+from typing import List, Dict, Any, Optional
+
+class ConnectionConfig(BaseModel):
+    server: str
+    database: Optional[str] = None
+    username: Optional[str] = None
+    password: Optional[str] = None
+    driver: Optional[str] = None
+    trusted_connection: bool = False
+
+class QueryGenerationRequest(BaseModel):
+    question: str
+    schema: Dict[str, Any]
+    connection_config: ConnectionConfig
+
+class QueryExecutionRequest(BaseModel):
+    query: str
+    connection_config: ConnectionConfig
+""")
+                
+        # Create placeholder modules if needed - quick fix for demo
+        if not os.path.exists(os.path.join(current_dir, "db_operations.py")):
+            print("Creating placeholder db_operations.py")
+            with open(os.path.join(current_dir, "db_operations.py"), "w") as f:
+                f.write("""
+def connect_and_list_databases(config):
+    return {"status": "error", "message": "Placeholder implementation - this backend is incomplete"}
+
+def parse_database_schema(config):
+    return {"status": "error", "message": "Placeholder implementation - this backend is incomplete"}
+
+def execute_query(request_dict):
+    return {"status": "error", "message": "Placeholder implementation - this backend is incomplete"}
+
+def terminate_session(config):
+    return {"status": "success", "message": "Placeholder implementation - no real session to terminate"}
+""")
+                
+        if not os.path.exists(os.path.join(current_dir, "query_generator.py")):
+            print("Creating placeholder query_generator.py")
+            with open(os.path.join(current_dir, "query_generator.py"), "w") as f:
+                f.write("""
+def generate_query(request_dict):
+    return {
+        "status": "error", 
+        "message": "Placeholder implementation - this backend is incomplete", 
+        "query": "-- This is a placeholder query\\nSELECT 'Please check backend setup' AS message;"
+    }
+""")
+            
+        # Try importing again after creating placeholders
+        try:
+            from models import ConnectionConfig, QueryGenerationRequest, QueryExecutionRequest
+            from db_operations import connect_and_list_databases, parse_database_schema, execute_query, terminate_session
+            from query_generator import generate_query
+            logging.info("Successfully imported placeholder modules")
+        except ImportError as e:
+            logging.error(f"Still failed to import after creating placeholders: {e}")
+            traceback.print_exc()
+            raise
 
 # ------------------------------ Load environment variables ------------------------------
 load_dotenv()
