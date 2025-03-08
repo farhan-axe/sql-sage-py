@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -6,7 +5,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { DatabaseInfo, QueryRefinementAttempt, QueryErrorType, QueryInterfaceProps } from "@/types/database";
 import DataDisplay from "./DataDisplay";
 import ChartVisualization from "./ChartVisualization";
-import { RotateCcw, PlayCircle, XCircle, Clock, AlertCircle, Save, Plus } from "lucide-react";
+import { RotateCcw, PlayCircle, XCircle, Clock, AlertCircle, Save, Plus, Speedometer } from "lucide-react";
 import { terminateSession, isNonSqlResponse } from "@/services/sqlServer";
 
 const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate, onSaveQuery, onQueryGenerated }: QueryInterfaceProps) => {
@@ -21,6 +20,7 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate, onSaveQ
   const [elapsedTime, setElapsedTime] = useState(0);
   const [refinementAttempts, setRefinementAttempts] = useState<QueryRefinementAttempt[]>([]);
   const [queryError, setQueryError] = useState<string | null>(null);
+  const [queryGenerationTime, setQueryGenerationTime] = useState<number | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef<number | null>(null);
 
@@ -193,6 +193,7 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate, onSaveQ
     setQueryResults(null);
     setRefinementAttempts([]);
     setQueryError(null);
+    setQueryGenerationTime(null);
 
     const newController = new AbortController();
     setController(newController);
@@ -234,6 +235,9 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate, onSaveQ
       const generatedData = await generateResponse.json();
       const endTime = Date.now(); // Track when we finish generating
       const timeElapsed = endTime - startTime;
+      
+      // Store the generation time in component state
+      setQueryGenerationTime(timeElapsed);
       
       // Call the callback with the time it took to generate the query
       if (onQueryGenerated) {
@@ -440,6 +444,11 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate, onSaveQ
     }
   };
 
+  const formatGenerationTime = (ms: number | null) => {
+    if (ms === null) return "";
+    return ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(2)}s`;
+  };
+
   if (!isConnected || !databaseInfo) {
     return (
       <div className="h-full flex items-center justify-center">
@@ -514,7 +523,15 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate, onSaveQ
 
       {generatedQuery && !queryError && (
         <div className="space-y-2">
-          <h3 className="text-sm font-medium text-gray-700">Generated SQL Query</h3>
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-medium text-gray-700">Generated SQL Query</h3>
+            {queryGenerationTime !== null && (
+              <div className="flex items-center gap-1 text-xs text-gray-500">
+                <Speedometer size={14} className="text-blue-500" />
+                <span>Generated in {formatGenerationTime(queryGenerationTime)}</span>
+              </div>
+            )}
+          </div>
           <pre className="bg-gray-50 p-4 rounded-lg overflow-x-auto">
             <code className="text-sm">{generatedQuery}</code>
           </pre>
