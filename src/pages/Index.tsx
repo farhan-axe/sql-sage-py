@@ -154,29 +154,16 @@ const Index = () => {
       const dbName = databaseInfo.connectionConfig.database;
       
       if (databaseInfo.queryExamples) {
-        const question57Regex = /57\.\s+provide me list of products,\s+sales territory country name and their sales amount\?/;
-        if (question57Regex.test(databaseInfo.queryExamples)) {
+        if (databaseInfo.queryExamples.includes("57. provide me list of products, sales territory country name and their sales amount?")) {
           const updatedExamples = databaseInfo.queryExamples.replace(
-            /(57\.\s+provide me list of products,\s+sales territory country name and their sales amount\?,\s+Your SQL Query will be like ")SELECT TOP 200[\s\S]+?FROM \[\w+\]\.(\[dbo\]\.\[DimProduct\][\s\S]+?)(?=\d+\.|\s*$)/g,
-            (match, prefix, tablesSection) => {
-              const correctedTablesSection = tablesSection
-                .replace(/\[(\w+)\]\.\[dbo\]\.\[DimProduct\]/g, `[${dbName}].[dbo].[DimProduct]`)
-                .replace(/\[(\w+)\]\.\[dbo\]\.\[FactInternetSales\]/g, `[${dbName}].[dbo].[FactInternetSales]`)
-                .replace(/\[(\w+)\]\.\[dbo\]\.\[DimSalesTerritory\]/g, `[${dbName}].[dbo].[DimSalesTerritory]`);
-              
-              return `${prefix}SELECT TOP 200 
-    p.EnglishProductName AS ProductName,
-    st.SalesTerritoryCountry AS Country,
-    SUM(f.SalesAmount) AS TotalSales
-FROM [${dbName}].[dbo].[DimProduct] p
-JOIN [${dbName}].[dbo].[FactInternetSales] f ON p.ProductKey = f.ProductKey
-JOIN [${dbName}].[dbo].[DimSalesTerritory] st ON st.SalesTerritoryKey = f.SalesTerritoryKey
-GROUP BY p.EnglishProductName, st.SalesTerritoryCountry;`;
+            /(57\. provide me list of products, sales territory country name and their sales amount\?,\s+Your SQL Query will be like "SELECT TOP 200\s+p\.EnglishProductName AS ProductName,\s+st\.SalesTerritoryCountry AS Country,\s+SUM\(f\.SalesAmount\) AS TotalSales\s+FROM \[)([^\]]+)(\]\.\[dbo\]\.\[DimProduct\] p\s+JOIN \[)([^\]]+)(\]\.\[dbo\]\.\[FactInternetSales\] f ON p\.ProductKey = f\.ProductKey\s+JOIN \[)([^\]]+)(\]\.\[dbo\]\.\[DimSalesTerritory\] st ON st\.SalesTerritoryKey = f\.SalesTerritoryKey\s+GROUP BY p\.EnglishProductName, st\.SalesTerritoryCountry;)/g,
+            (match, prefix, db1, middle1, db2, middle2, db3, suffix) => {
+              return `${prefix}${dbName}${middle1}${dbName}${middle2}${dbName}${suffix}`;
             }
           );
           
           if (updatedExamples !== databaseInfo.queryExamples) {
-            console.log("Updated question 57 with correct database name");
+            console.log("Updated question 57 with correct database name:", dbName);
             setDatabaseInfo({
               ...databaseInfo,
               queryExamples: updatedExamples
@@ -185,7 +172,7 @@ GROUP BY p.EnglishProductName, st.SalesTerritoryCountry;`;
         } else if (!databaseInfo.queryExamples.includes("provide me list of products, sales territory")) {
           const productSalesExample = `
       
-${databaseInfo.queryExamples.split('\n\n').filter(e => e.trim()).length + 1}. provide me list of products, sales territory country name and their sales amount?,
+57. provide me list of products, sales territory country name and their sales amount?,
 Your SQL Query will be like "SELECT TOP 200 
     p.EnglishProductName AS ProductName,
     st.SalesTerritoryCountry AS Country,
