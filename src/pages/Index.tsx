@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import DatabaseConnection from "@/components/DatabaseConnection";
 import QueryInterface from "@/components/QueryInterface";
@@ -7,13 +6,14 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { AlertCircle, DatabaseIcon, AlertTriangle } from "lucide-react";
+import { AlertCircle, DatabaseIcon, AlertTriangle, Clock } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const Index = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [databaseInfo, setDatabaseInfo] = useState<DatabaseInfo | null>(null);
   const [isParsing, setIsParsing] = useState(false);
+  const [queryGenerationTime, setQueryGenerationTime] = useState<number | null>(null);
   const { toast } = useToast();
 
   const handleSessionTermination = (success: boolean) => {
@@ -104,6 +104,10 @@ const Index = () => {
     });
     
     console.log("Updated query examples:", updatedExamples);
+  };
+
+  const handleQueryGenerated = (timeInMs: number) => {
+    setQueryGenerationTime(timeInMs);
   };
 
   const EmptyStateContent = ({ message, icon = <AlertCircle className="h-12 w-12 text-gray-400 mb-4" />, warning = false }: { 
@@ -212,6 +216,20 @@ GROUP BY p.EnglishProductName, st.SalesTerritoryCountry;"
             </Tabs>
           </div>
         )}
+
+        {queryGenerationTime !== null && (
+          <div className="mt-4">
+            <Alert className="bg-blue-50 border-blue-200">
+              <Clock className="h-4 w-4 text-blue-600" />
+              <AlertTitle>Query Generation Time</AlertTitle>
+              <AlertDescription className="text-sm">
+                {queryGenerationTime < 1000 
+                  ? `${queryGenerationTime}ms` 
+                  : `${(queryGenerationTime / 1000).toFixed(2)}s`}
+              </AlertDescription>
+            </Alert>
+          </div>
+        )}
       </div>
 
       <div className="flex-1 p-6">
@@ -220,6 +238,7 @@ GROUP BY p.EnglishProductName, st.SalesTerritoryCountry;"
           databaseInfo={databaseInfo}
           onSessionTerminate={handleSessionTermination}
           onSaveQuery={handleSaveQuery}
+          onQueryGenerated={handleQueryGenerated}
         />
       </div>
     </div>

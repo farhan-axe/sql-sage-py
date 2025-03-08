@@ -1,4 +1,3 @@
-
 export interface TableInfo {
   name: string;
   schema: string[];
@@ -74,4 +73,13 @@ export interface QueryExecutionResponse {
 
 export interface QueryGenerationResponse {
   query: string;
+}
+
+// Adding the QueryInterfaceProps interface to include the new onQueryGenerated callback
+export interface QueryInterfaceProps {
+  isConnected: boolean;
+  databaseInfo: DatabaseInfo | null;
+  onSessionTerminate: (success: boolean) => void;
+  onSaveQuery: (question: string, query: string) => void;
+  onQueryGenerated?: (timeInMs: number) => void;
 }

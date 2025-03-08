@@ -3,15 +3,16 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { connectToServer, parseDatabase } from "@/services/sqlServer";
 import type { DatabaseInfo, ConnectionConfig } from "@/types/database";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle, InfoIcon, CheckCircle2, Loader2, DatabaseIcon, PlusCircle, X } from "lucide-react";
+import { AlertCircle, InfoIcon, CheckCircle2, Loader2, DatabaseIcon, X, Check, ListChecks } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface DatabaseConnectionProps {
   onConnect: (info: DatabaseInfo) => void;
@@ -22,6 +23,7 @@ interface DatabaseConnectionProps {
 interface DatabaseSelection {
   database: string;
   parsed: boolean;
+  selected: boolean;
 }
 
 const DatabaseConnection = ({ onConnect, isParsing, setIsParsing }: DatabaseConnectionProps) => {
@@ -36,7 +38,6 @@ const DatabaseConnection = ({ onConnect, isParsing, setIsParsing }: DatabaseConn
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [connectionSuccess, setConnectionSuccess] = useState(false);
   const [parseError, setParseError] = useState<string | null>(null);
-  const [currentDbSelection, setCurrentDbSelection] = useState("");
 
   const handleConnect = async () => {
     setIsConnecting(true);
@@ -56,6 +57,7 @@ const DatabaseConnection = ({ onConnect, isParsing, setIsParsing }: DatabaseConn
       });
       
       setDatabases(dbs);
+      setSelectedDbs([]);
       setConnectionSuccess(true);
       toast({
         title: "Connected successfully",
@@ -74,13 +76,43 @@ const DatabaseConnection = ({ onConnect, isParsing, setIsParsing }: DatabaseConn
     }
   };
 
-  const addDatabase = () => {
-    if (!currentDbSelection || selectedDbs.some(db => db.database === currentDbSelection)) {
-      return;
-    }
+  const toggleDatabaseSelection = (dbName: string) => {
+    setSelectedDbs(prevDbs => {
+      const existingDb = prevDbs.find(db => db.database === dbName);
+      
+      if (existingDb) {
+        // If already in list, toggle selection
+        return prevDbs.map(db => 
+          db.database === dbName ? { ...db, selected: !db.selected } : db
+        );
+      } else {
+        // If not in list, add it as selected
+        return [...prevDbs, { database: dbName, parsed: false, selected: true }];
+      }
+    });
+  };
+
+  const toggleSelectAll = () => {
+    // Check if all databases are already selected
+    const allSelected = databases.every(db => 
+      selectedDbs.some(selected => selected.database === db && selected.selected)
+    );
     
-    setSelectedDbs([...selectedDbs, { database: currentDbSelection, parsed: false }]);
-    setCurrentDbSelection("");
+    if (allSelected) {
+      // Deselect all
+      setSelectedDbs(prevDbs => prevDbs.map(db => ({ ...db, selected: false })));
+    } else {
+      // Select all
+      const currentDbs = [...selectedDbs];
+      const allDbs = databases.map(db => {
+        const existing = currentDbs.find(d => d.database === db);
+        return existing 
+          ? { ...existing, selected: true }
+          : { database: db, parsed: false, selected: true };
+      });
+      
+      setSelectedDbs(allDbs);
+    }
   };
 
   const removeDatabase = (dbName: string) => {
@@ -147,6 +179,11 @@ const DatabaseConnection = ({ onConnect, isParsing, setIsParsing }: DatabaseConn
       setIsParsing(false);
     }
   };
+
+  const allSelected = databases.length > 0 && 
+    databases.every(db => selectedDbs.some(selected => selected.database === db && selected.selected));
+
+  const selectedCount = selectedDbs.filter(db => db.selected).length;
 
   return (
     <div className="space-y-6">
@@ -262,81 +299,70 @@ const DatabaseConnection = ({ onConnect, isParsing, setIsParsing }: DatabaseConn
       {databases.length > 0 && (
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label>Select Databases to Parse</Label>
+            <div className="flex items-center justify-between">
+              <Label>Select Databases to Parse</Label>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={toggleSelectAll}
+                className="text-xs h-8"
+              >
+                <ListChecks className="h-3.5 w-3.5 mr-1" />
+                {allSelected ? "Deselect All" : "Select All"}
+              </Button>
+            </div>
             
-            {/* Selected databases list */}
-            {selectedDbs.length > 0 && (
-              <div className="mb-4 space-y-2">
-                <Label className="text-sm text-gray-600">Selected Databases:</Label>
-                <div className="space-y-2">
-                  {selectedDbs.map((db) => (
-                    <Card key={db.database} className={`bg-gray-50 ${db.parsed ? 'border-green-200' : ''}`}>
-                      <CardContent className="p-3 flex justify-between items-center">
-                        <div className="flex items-center space-x-2">
-                          <DatabaseIcon className="h-4 w-4 text-gray-500" />
-                          <span>{db.database}</span>
-                          {db.parsed && (
-                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                              Parsed
-                            </Badge>
-                          )}
-                        </div>
-                        <div className="flex space-x-2">
-                          {!db.parsed && (
+            <Card className="border rounded-md">
+              <CardContent className="p-0">
+                <ScrollArea className="h-[220px] py-2">
+                  <div className="px-2 py-1">
+                    {databases.map((db) => {
+                      const dbSelection = selectedDbs.find(selection => selection.database === db);
+                      const isSelected = dbSelection?.selected ?? false;
+                      const isParsed = dbSelection?.parsed ?? false;
+                      
+                      return (
+                        <div key={db} className="flex items-center justify-between py-2 px-2 hover:bg-gray-50 rounded">
+                          <div className="flex items-center gap-2">
+                            <Checkbox 
+                              id={`db-${db}`}
+                              checked={isSelected}
+                              onCheckedChange={() => toggleDatabaseSelection(db)}
+                            />
+                            <Label htmlFor={`db-${db}`} className="cursor-pointer flex items-center gap-2">
+                              <DatabaseIcon className="h-4 w-4 text-gray-500" />
+                              <span>{db}</span>
+                              {isParsed && (
+                                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-xs ml-1">
+                                  Parsed
+                                </Badge>
+                              )}
+                            </Label>
+                          </div>
+                          {isSelected && !isParsed && (
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => handleParseDatabase(db.database)}
+                              onClick={() => handleParseDatabase(db)}
                               disabled={isParsing}
-                              className="h-8 text-xs"
+                              className="h-7 text-xs"
                             >
                               {isParsing ? <Loader2 className="h-3 w-3 animate-spin" /> : "Parse"}
                             </Button>
                           )}
-                          <Button
-                            size="sm" 
-                            variant="ghost" 
-                            className="h-8 w-8 p-0 text-gray-500"
-                            onClick={() => removeDatabase(db.database)}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
                         </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
+                      );
+                    })}
+                  </div>
+                </ScrollArea>
+              </CardContent>
+            </Card>
+            
+            {selectedCount > 0 && (
+              <div className="text-sm text-gray-500">
+                {selectedCount} database{selectedCount !== 1 ? 's' : ''} selected
               </div>
             )}
-            
-            {/* Add database selector */}
-            <div className="flex space-x-2">
-              <Select 
-                value={currentDbSelection} 
-                onValueChange={setCurrentDbSelection}
-              >
-                <SelectTrigger className="flex-1">
-                  <SelectValue placeholder="Choose a database" />
-                </SelectTrigger>
-                <SelectContent>
-                  {databases
-                    .filter(db => !selectedDbs.some(selected => selected.database === db))
-                    .map((db) => (
-                      <SelectItem key={db} value={db}>
-                        {db}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-              <Button
-                onClick={addDatabase}
-                disabled={!currentDbSelection}
-                size="icon"
-                className="h-10 w-10"
-              >
-                <PlusCircle className="h-5 w-5" />
-              </Button>
-            </div>
           </div>
         </div>
       )}
