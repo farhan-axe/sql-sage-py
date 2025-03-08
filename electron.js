@@ -1,7 +1,7 @@
 
-const { app, BrowserWindow, shell } = require('electron');
+const { app, BrowserWindow, shell, dialog } = require('electron');
 const path = require('path');
-const { spawn } = require('child_process');
+const { spawn, execSync } = require('child_process');
 const fs = require('fs');
 
 let mainWindow;
@@ -42,6 +42,8 @@ function createWindow() {
 }
 
 function findPythonPath() {
+  console.log("Searching for Python installation...");
+  
   // Try to find Python in common locations
   const pythonCommands = ['python', 'python3', 'py'];
   
@@ -50,7 +52,12 @@ function findPythonPath() {
     // Add common Windows Python installation paths
     const programFiles = process.env['ProgramFiles'] || 'C:\\Program Files';
     const programFilesX86 = process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
+    const localAppData = process.env['LOCALAPPDATA'] || 'C:\\Users\\Default\\AppData\\Local';
     
+    // Add Python launcher which should be in PATH if Python is installed
+    pythonCommands.push('py.exe');
+    
+    // Add standard installation paths
     for (const base of [programFiles, programFilesX86]) {
       pythonCommands.push(
         path.join(base, 'Python38', 'python.exe'),
@@ -60,57 +67,124 @@ function findPythonPath() {
         path.join(base, 'Python312', 'python.exe')
       );
     }
+    
+    // Add Microsoft Store Python installations
+    pythonCommands.push(
+      path.join(localAppData, 'Programs', 'Python', 'Python38', 'python.exe'),
+      path.join(localAppData, 'Programs', 'Python', 'Python39', 'python.exe'),
+      path.join(localAppData, 'Programs', 'Python', 'Python310', 'python.exe'),
+      path.join(localAppData, 'Programs', 'Python', 'Python311', 'python.exe'),
+      path.join(localAppData, 'Programs', 'Python', 'Python312', 'python.exe')
+    );
+    
+    // Check if Python is in PATH via 'where' command
+    try {
+      const whereOutput = execSync('where python').toString().trim().split('\n')[0];
+      if (whereOutput && !pythonCommands.includes(whereOutput)) {
+        pythonCommands.push(whereOutput);
+        console.log(`Found Python in PATH: ${whereOutput}`);
+      }
+    } catch (e) {
+      console.log("Python not found in PATH");
+    }
+  } else {
+    // On Unix systems, try to use 'which' to find Python
+    try {
+      const whichOutput = execSync('which python3 || which python').toString().trim();
+      if (whichOutput && !pythonCommands.includes(whichOutput)) {
+        pythonCommands.push(whichOutput);
+        console.log(`Found Python via 'which': ${whichOutput}`);
+      }
+    } catch (e) {
+      console.log("Python not found using 'which'");
+    }
   }
+  
+  // Check bundled Python if app is packaged
+  if (app.isPackaged) {
+    const bundledPython = path.join(path.dirname(app.getPath('exe')), 'python', 'python.exe');
+    if (fs.existsSync(bundledPython)) {
+      console.log(`Found bundled Python: ${bundledPython}`);
+      pythonCommands.unshift(bundledPython);  // Prioritize bundled Python
+    }
+  }
+  
+  console.log(`Checking these Python paths: ${pythonCommands.join(', ')}`);
   
   // Try each command
   for (const cmd of pythonCommands) {
     try {
+      if (!fs.existsSync(cmd) && cmd.includes(path.sep)) {
+        console.log(`Skipping non-existent path: ${cmd}`);
+        continue;
+      }
+      
+      console.log(`Testing Python path: ${cmd}`);
       const result = require('child_process').spawnSync(cmd, ['--version']);
       if (result.status === 0) {
-        console.log(`Found Python: ${cmd} - ${result.stdout.toString().trim()}`);
+        const version = result.stdout.toString().trim() || result.stderr.toString().trim();
+        console.log(`Found working Python: ${cmd} - ${version}`);
         return cmd;
+      } else {
+        console.log(`Python path ${cmd} exists but returned status ${result.status}`);
       }
     } catch (e) {
-      // This command failed, try the next one
+      console.log(`Error testing ${cmd}: ${e.message}`);
     }
   }
   
-  // If we get here, we couldn't find Python - use a default and hope for the best
-  console.warn("Could not find Python. Using default 'python' command.");
-  return process.platform === 'win32' ? 'python.exe' : 'python';
+  // If we get here, we couldn't find Python - throw an error
+  throw new Error("Could not find a working Python installation. Please install Python and make sure it's in your PATH.");
 }
 
 function startBackend() {
   try {
-    // Find the right Python command
+    // Try to find a working Python installation
     const pythonPath = findPythonPath();
     console.log(`Using Python: ${pythonPath}`);
 
     // Get backend directory (relative to app location)
     let backendDir;
+    const possibleBackendLocations = [];
+    
     if (app.isPackaged) {
-      // In packaged app, backend should be in a 'backend' directory next to the executable
-      backendDir = path.join(path.dirname(app.getPath('exe')), 'backend');
-      
-      // If that fails, try looking relative to app path
-      if (!fs.existsSync(backendDir)) {
-        backendDir = path.join(app.getAppPath(), '..', 'backend');
-      }
-      
-      // If that fails too, try looking inside app directory
-      if (!fs.existsSync(backendDir)) {
-        backendDir = path.join(app.getAppPath(), 'backend');
-      }
+      // In packaged app, try various locations
+      possibleBackendLocations.push(
+        // Relative to executable
+        path.join(path.dirname(app.getPath('exe')), 'backend'),
+        // Relative to app path
+        path.join(app.getAppPath(), '..', 'backend'),
+        // Inside app directory
+        path.join(app.getAppPath(), 'backend'),
+        // Resources directory
+        path.join(app.getAppPath(), '..', 'resources', 'backend'),
+        // One level up from project root
+        path.join(app.getAppPath(), '..', '..', 'backend')
+      );
     } else {
-      // In development, backend should be one level up from current directory, then into 'backend'
-      backendDir = path.join(path.dirname(app.getAppPath()), 'backend');
+      // In development, try various locations
+      possibleBackendLocations.push(
+        // Backend inside current directory
+        path.join(app.getAppPath(), 'backend'),
+        // Backend next to frontend
+        path.join(path.dirname(app.getAppPath()), 'backend'),
+        // Backend in parent directory
+        path.join(path.dirname(path.dirname(app.getAppPath())), 'backend')
+      );
+    }
+    
+    console.log("Checking possible backend locations:");
+    for (const location of possibleBackendLocations) {
+      console.log(`- ${location}`);
+      if (fs.existsSync(location)) {
+        backendDir = location;
+        console.log(`Found backend at: ${backendDir}`);
+        break;
+      }
     }
 
-    console.log(`Looking for backend at: ${backendDir}`);
-    
-    if (!fs.existsSync(backendDir)) {
-      console.error(`Backend directory not found at ${backendDir}`);
-      throw new Error(`Backend directory not found at ${backendDir}`);
+    if (!backendDir) {
+      throw new Error(`Backend directory not found. Checked: ${possibleBackendLocations.join(', ')}`);
     }
 
     // Determine which file to run (run_backend.py or sql.py)
@@ -132,8 +206,10 @@ function startBackend() {
     const env = { ...process.env };
     if (process.platform === 'win32') {
       env.PATH = `${backendDir};${env.PATH}`;
+      env.PYTHONPATH = backendDir + (env.PYTHONPATH ? `;${env.PYTHONPATH}` : '');
     } else {
       env.PATH = `${backendDir}:${env.PATH}`;
+      env.PYTHONPATH = backendDir + (env.PYTHONPATH ? `:${env.PYTHONPATH}` : '');
     }
     
     // Spawn the process with the enhanced environment
@@ -157,7 +233,6 @@ function startBackend() {
       console.log(`Backend process exited with code ${code}`);
       if (code !== 0 && mainWindow) {
         // Show error dialog
-        const { dialog } = require('electron');
         dialog.showErrorBox(
           'Backend Error',
           `The SQL Sage backend process exited unexpectedly with code ${code}.\n\n` +
@@ -169,7 +244,6 @@ function startBackend() {
     backendProcess.on('error', (err) => {
       console.error(`Failed to start backend: ${err}`);
       if (mainWindow) {
-        const { dialog } = require('electron');
         dialog.showErrorBox(
           'Backend Error',
           `Failed to start the SQL Sage backend: ${err.message}\n\n` +
@@ -180,11 +254,12 @@ function startBackend() {
   } catch (error) {
     console.error(`Error starting backend: ${error.message}`);
     if (mainWindow) {
-      const { dialog } = require('electron');
       dialog.showErrorBox(
         'Error Starting Backend',
         `Failed to start SQL Sage backend: ${error.message}\n\n` +
-        'Please make sure Python is installed and check that Ollama is running.'
+        'Please make sure Python is installed and in your PATH.\n' + 
+        'If Python is installed, try running the backend manually by opening a terminal in the "backend" directory and running:\n' +
+        'python sql.py'
       );
     }
   }
