@@ -1,21 +1,15 @@
+
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
-import { DatabaseInfo, QueryRefinementAttempt, QueryErrorType } from "@/types/database";
+import { DatabaseInfo, QueryRefinementAttempt, QueryErrorType, QueryInterfaceProps } from "@/types/database";
 import DataDisplay from "./DataDisplay";
 import ChartVisualization from "./ChartVisualization";
 import { RotateCcw, PlayCircle, XCircle, Clock, AlertCircle, Save, Plus } from "lucide-react";
 import { terminateSession, isNonSqlResponse } from "@/services/sqlServer";
 
-interface QueryInterfaceProps {
-  isConnected: boolean;
-  databaseInfo: DatabaseInfo | null;
-  onSessionTerminate: (success: boolean) => void;
-  onSaveQuery?: (question: string, query: string) => void;
-}
-
-const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate, onSaveQuery }: QueryInterfaceProps) => {
+const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate, onSaveQuery, onQueryGenerated }: QueryInterfaceProps) => {
   const { toast } = useToast();
   const [question, setQuestion] = useState("");
   const [generatedQuery, setGeneratedQuery] = useState("");
@@ -214,6 +208,7 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate, onSaveQ
     }, 180000);
     
     setSessionTimeout(timeout);
+    const startTime = Date.now(); // Track when we start generating
     
     try {
       console.log("Starting query generation...");
@@ -237,7 +232,16 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate, onSaveQ
       );
 
       const generatedData = await generateResponse.json();
+      const endTime = Date.now(); // Track when we finish generating
+      const timeElapsed = endTime - startTime;
+      
+      // Call the callback with the time it took to generate the query
+      if (onQueryGenerated) {
+        onQueryGenerated(timeElapsed);
+      }
+      
       console.log("Generated response:", generatedData.query);
+      console.log(`Query generation took ${timeElapsed}ms`);
       
       if (isNonSqlResponse(generatedData.query)) {
         console.log("Detected non-SQL response, displaying as error message");
