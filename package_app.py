@@ -5,14 +5,54 @@ import shutil
 import subprocess
 import platform
 
+def find_npm():
+    """Find the npm executable based on the platform."""
+    npm_cmd = "npm.cmd" if platform.system() == "Windows" else "npm"
+    
+    # Check if npm is in PATH
+    try:
+        subprocess.check_call([npm_cmd, "--version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        return npm_cmd
+    except (subprocess.SubprocessError, FileNotFoundError):
+        # If npm is not in PATH, try common locations
+        if platform.system() == "Windows":
+            common_paths = [
+                os.path.join(os.environ.get("APPDATA", ""), "npm", "npm.cmd"),
+                r"C:\Program Files\nodejs\npm.cmd",
+                r"C:\Program Files (x86)\nodejs\npm.cmd"
+            ]
+            for path in common_paths:
+                if os.path.exists(path):
+                    return path
+        else:
+            common_paths = [
+                "/usr/local/bin/npm",
+                "/usr/bin/npm"
+            ]
+            for path in common_paths:
+                if os.path.exists(path):
+                    return path
+    
+    # If we can't find npm, raise an error
+    raise FileNotFoundError("Cannot find npm executable. Please make sure Node.js and npm are installed and in your PATH.")
+
 def build_frontend():
     print("Building Frontend (Vite app)...")
     
-    # Build the React app using Vite
-    subprocess.check_call(["npm", "run", "build"])
+    npm_cmd = find_npm()
     
-    print("Frontend build complete!")
-    return os.path.join(os.getcwd(), "dist")
+    # Build the React app using Vite
+    try:
+        subprocess.check_call([npm_cmd, "run", "build"])
+        print("Frontend build complete!")
+        return os.path.join(os.getcwd(), "dist")
+    except subprocess.CalledProcessError as e:
+        print(f"Error building frontend: {e}")
+        print("Trying to continue with packaging...")
+        # Even if build fails, try to continue if dist directory exists
+        if os.path.exists(os.path.join(os.getcwd(), "dist")):
+            return os.path.join(os.getcwd(), "dist")
+        raise
 
 def setup_electron():
     print("Setting up Electron packaging...")
@@ -56,21 +96,28 @@ def build_electron_app(backend_exe_path):
     if os.path.exists(".env"):
         shutil.copy(".env", os.path.join(backend_dir, ".env"))
     
+    npm_cmd = find_npm()
+    
     # Install Electron dependencies
-    subprocess.check_call(["npm", "install", "--save-dev", "electron", "electron-builder"])
-    
-    # Build Electron app
-    subprocess.check_call(["npx", "electron-builder", "--dir"])
-    
-    print("Electron app build complete!")
-    
-    # Return path to the Electron app
-    if platform.system() == "Windows":
-        return os.path.join(os.getcwd(), "electron-dist", "win-unpacked")
-    elif platform.system() == "Darwin":  # macOS
-        return os.path.join(os.getcwd(), "electron-dist", "mac")
-    else:  # Linux
-        return os.path.join(os.getcwd(), "electron-dist", "linux-unpacked")
+    try:
+        subprocess.check_call([npm_cmd, "install", "--save-dev", "electron", "electron-builder"])
+        
+        # Build Electron app
+        npx_cmd = "npx.cmd" if platform.system() == "Windows" else "npx"
+        subprocess.check_call([npx_cmd, "electron-builder", "--dir"])
+        
+        print("Electron app build complete!")
+        
+        # Return path to the Electron app
+        if platform.system() == "Windows":
+            return os.path.join(os.getcwd(), "electron-dist", "win-unpacked")
+        elif platform.system() == "Darwin":  # macOS
+            return os.path.join(os.getcwd(), "electron-dist", "mac")
+        else:  # Linux
+            return os.path.join(os.getcwd(), "electron-dist", "linux-unpacked")
+    except subprocess.CalledProcessError as e:
+        print(f"Error building Electron app: {e}")
+        raise
 
 def create_ollama_instructions():
     instructions = """
@@ -109,7 +156,11 @@ def package_application():
     backend_exe_path = build_backend()
     
     # Build the frontend
-    build_frontend()
+    try:
+        build_frontend()
+    except Exception as e:
+        print(f"Warning: Frontend build failed with error: {e}")
+        print("Continuing with packaging process...")
     
     # Setup Electron
     setup_electron()
