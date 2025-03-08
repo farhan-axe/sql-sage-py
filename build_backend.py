@@ -11,6 +11,12 @@ def find_backend_directory():
     current_dir = os.getcwd()
     print(f"Current directory: {current_dir}")
     
+    # User-specified path - check first based on error message
+    user_specified = os.path.join(os.path.dirname(current_dir), "..", "backend")
+    if os.path.exists(os.path.join(user_specified, "sql.py")):
+        print(f"Found backend at user-specified location: {user_specified}")
+        return user_specified
+    
     # Try various potential locations for the backend
     potential_locations = [
         # Current directory / backend
@@ -28,8 +34,8 @@ def find_backend_directory():
         # Explicit path with 'sqlbot' in it (based on error message)
         os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(current_dir)), "..", "backend")),
         
-        # Even more specific path based on user message
-        os.path.abspath(os.path.join(current_dir, "..", "..", "..", "backend")),
+        # Another possible location mentioned by user
+        os.path.abspath(os.path.join(os.path.dirname(current_dir), "..", "sqlbot", "backend")),
     ]
     
     # Print all paths we're going to check
@@ -66,6 +72,26 @@ def find_backend_directory():
     
     # Return None if we can't find it
     return None
+
+def detect_conda_environment():
+    """Detect if we're running in a conda environment and get the python executable path."""
+    # Check if we're in a conda environment
+    conda_prefix = os.environ.get('CONDA_PREFIX')
+    if conda_prefix:
+        print(f"Detected conda environment: {conda_prefix}")
+        # Get the python executable path within the conda environment
+        if platform.system() == "Windows":
+            python_exe = os.path.join(conda_prefix, "python.exe")
+        else:
+            python_exe = os.path.join(conda_prefix, "bin", "python")
+        
+        if os.path.exists(python_exe):
+            print(f"Found conda Python executable: {python_exe}")
+            return python_exe
+    
+    # If we're not in a conda environment or couldn't find the python executable
+    print(f"Using system Python: {sys.executable}")
+    return sys.executable
 
 def build_backend():
     """
@@ -106,24 +132,101 @@ def build_backend():
     if os.path.exists(req_file):
         shutil.copy2(req_file, os.path.join(backend_dir, "requirements.txt"))
         print("Copied requirements.txt to local backend directory")
+    else:
+        # Create a requirements.txt if it doesn't exist
+        with open(os.path.join(backend_dir, "requirements.txt"), 'w') as f:
+            f.write("fastapi>=0.68.0\nuvicorn>=0.15.0\npyodbc>=4.0.32\npython-dotenv>=0.19.1\nrequests>=2.26.0\n")
+        print("Created requirements.txt file")
+    
+    # Create a .env file if it doesn't exist
+    env_file = os.path.join(backend_dir, ".env")
+    if not os.path.exists(env_file):
+        with open(env_file, 'w') as f:
+            f.write("# Default configuration\nMODEL=deepseek-r1:8b\nPORT=5000\n")
+        print("Created .env file")
+    
+    # Detect conda environment python path
+    python_path = detect_conda_environment()
     
     # Create a run_backend.py file which will be our entry point
-    create_backend_launcher(backend_dir)
+    create_backend_launcher(backend_dir, python_path=python_path)
     
     print("Backend preparation complete!")
     return backend_dir
 
-def create_backend_launcher(backend_dir, has_source=True):
+def create_backend_launcher(backend_dir, has_source=True, python_path=None):
     """Create a launcher script that will run sql.py"""
     backend_launcher = os.path.join(backend_dir, "run_backend.py")
     
+    # Get the python path - use the detected one or sys.executable as fallback
+    if not python_path:
+        python_path = sys.executable
+    
     with open(backend_launcher, 'w') as f:
-        f.write("""
+        f.write(f"""
 import os
 import sys
 import subprocess
 import platform
 import time
+
+# Hard-coded python path from build time
+CONDA_PYTHON_PATH = {repr(python_path)}
+
+def find_python_executable():
+    """Find the Python executable to use."""
+    # First try the hard-coded path from build time
+    if os.path.exists(CONDA_PYTHON_PATH):
+        print(f"Using conda Python: {{CONDA_PYTHON_PATH}}")
+        return CONDA_PYTHON_PATH
+    
+    # Check if we're running in a conda environment
+    conda_prefix = os.environ.get('CONDA_PREFIX')
+    if conda_prefix:
+        if platform.system() == "Windows":
+            conda_python = os.path.join(conda_prefix, "python.exe")
+        else:
+            conda_python = os.path.join(conda_prefix, "bin", "python")
+        
+        if os.path.exists(conda_python):
+            print(f"Found conda Python: {{conda_python}}")
+            return conda_python
+    
+    # Check common locations for Python
+    if platform.system() == "Windows":
+        common_paths = [
+            r"C:\\Python39\\python.exe",
+            r"C:\\Python310\\python.exe",
+            r"C:\\Program Files\\Python39\\python.exe",
+            r"C:\\Program Files\\Python310\\python.exe",
+            r"C:\\Program Files (x86)\\Python39\\python.exe",
+            r"C:\\Program Files (x86)\\Python310\\python.exe",
+            # Add conda paths
+            os.path.expanduser(r"~\\miniconda3\\python.exe"),
+            os.path.expanduser(r"~\\anaconda3\\python.exe"),
+            os.path.expanduser(r"~\\miniconda3\\envs\\sqlbot\\python.exe"),
+            os.path.expanduser(r"~\\anaconda3\\envs\\sqlbot\\python.exe"),
+        ]
+    else:
+        common_paths = [
+            "/usr/bin/python3",
+            "/usr/local/bin/python3",
+            "/opt/homebrew/bin/python3",
+            # Add conda paths
+            os.path.expanduser("~/miniconda3/bin/python"),
+            os.path.expanduser("~/anaconda3/bin/python"),
+            os.path.expanduser("~/miniconda3/envs/sqlbot/bin/python"),
+            os.path.expanduser("~/anaconda3/envs/sqlbot/bin/python"),
+        ]
+    
+    for path in common_paths:
+        if os.path.exists(path):
+            print(f"Found Python at common location: {{path}}")
+            return path
+    
+    # As a last resort, use the system's python (which may fail)
+    print("Using system Python as fallback")
+    return "python" if platform.system() == "Windows" else "python3"
 
 def run_backend():
     # Get the directory where this script is located
@@ -137,78 +240,57 @@ def run_backend():
     os.chdir(script_dir)
     
     # Print diagnostic information
-    print(f"Working directory: {os.getcwd()}")
-    print(f"Python executable: {sys.executable}")
-    print(f"Python version: {sys.version}")
-    print(f"System platform: {platform.platform()}")
-    print(f"Python path: {sys.path}")
+    print(f"Working directory: {{os.getcwd()}}")
+    print(f"System platform: {{platform.platform()}}")
+    
+    # Find the python executable
+    python_exe = find_python_executable()
+    print(f"Using Python executable: {{python_exe}}")
     
     try:
-        # Try to import required packages
-        import uvicorn
-        import fastapi
-        import pyodbc
-        print("Successfully imported required packages")
-    except ImportError as e:
-        print(f"Error importing required packages: {e}")
-        print("Attempting to install missing packages...")
+        # First, check if necessary packages are installed
+        print("Checking if required packages are installed...")
+        check_cmd = [python_exe, "-c", "import fastapi, uvicorn, pyodbc; print('Packages are available')"]
         try:
+            output = subprocess.check_output(check_cmd, stderr=subprocess.STDOUT, universal_newlines=True)
+            print(output)
+            packages_installed = True
+        except subprocess.CalledProcessError as e:
+            print(f"Error checking packages: {{e.output}}")
+            packages_installed = False
+        
+        if not packages_installed:
+            print("Installing required packages...")
             # Check if requirements.txt exists
             req_file = os.path.join(script_dir, "requirements.txt")
             if os.path.exists(req_file):
-                print(f"Installing packages from {req_file}")
-                subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", req_file])
+                print(f"Installing packages from {{req_file}}")
+                subprocess.check_call([python_exe, "-m", "pip", "install", "-r", req_file])
             else:
                 # Install minimum required packages
                 print("Installing minimum required packages")
-                subprocess.check_call([sys.executable, "-m", "pip", "install", "fastapi", "uvicorn", "pyodbc", "requests", "python-dotenv"])
-            
-            # Wait a moment for installation to complete
-            time.sleep(2)
-            
-            print("Package installation complete. Retrying import...")
-            import uvicorn
-            import fastapi
-            import pyodbc
-        except Exception as e:
-            print(f"Failed to install required packages: {e}")
-            sys.exit(1)
-    
-    # Check if sql.py exists in the current directory
-    sql_path = os.path.join(script_dir, "sql.py")
-    if not os.path.exists(sql_path):
-        print(f"Error: sql.py not found at {sql_path}")
-        print(f"Contents of {script_dir}:")
-        print(os.listdir(script_dir))
-        sys.exit(1)
-    
-    print(f"Starting SQL Server API from {sql_path}...")
-    
-    # Import and run the sql.py script
-    try:
-        # Try to import API from api_routes.py if it exists
+                subprocess.check_call([python_exe, "-m", "pip", "install", "fastapi", "uvicorn", "pyodbc", "requests", "python-dotenv"])
+        
+        # Check if api_routes.py exists
         api_routes_path = os.path.join(script_dir, "api_routes.py")
         if os.path.exists(api_routes_path):
-            print("Found api_routes.py, importing app")
-            sys.path.insert(0, script_dir)
-            from api_routes import app
-            print("Starting Uvicorn server with API...")
-            import uvicorn
-            uvicorn.run(app, host="127.0.0.1", port=5000)
-        else:
-            # Otherwise import sql.py
-            print("Importing sql module")
-            import sql
-            print("SQL module imported successfully")
+            print(f"Starting backend using {{api_routes_path}}")
+            subprocess.Popen([python_exe, api_routes_path])
+            return
+        
+        # Check if sql.py exists as fallback
+        sql_path = os.path.join(script_dir, "sql.py")
+        if os.path.exists(sql_path):
+            print(f"Starting backend using {{sql_path}}")
+            subprocess.Popen([python_exe, sql_path])
+            return
+        
+        print("ERROR: Could not find api_routes.py or sql.py. Backend cannot start.")
+        
     except Exception as e:
-        print(f"Error importing modules: {e}")
-        # If import fails, try running it as a subprocess
-        try:
-            print("Attempting to run sql.py as a subprocess...")
-            subprocess.call([sys.executable, sql_path])
-        except Exception as e:
-            print(f"Error running sql.py as subprocess: {e}")
-            sys.exit(1)
+        print(f"Error starting backend: {{e}}")
+        import traceback
+        traceback.print_exc()
 
 if __name__ == "__main__":
     run_backend()
@@ -261,16 +343,6 @@ if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=5000)
 """)
         print("Created placeholder sql.py file")
-        
-        # Create requirements.txt
-        with open(os.path.join(backend_dir, "requirements.txt"), 'w') as f:
-            f.write("fastapi>=0.68.0\nuvicorn>=0.15.0\npyodbc>=4.0.32\npython-dotenv>=0.19.1\nrequests>=2.26.0\n")
-        print("Created requirements.txt file")
-        
-        # Create .env
-        with open(os.path.join(backend_dir, ".env"), 'w') as f:
-            f.write("# Default configuration\nMODEL=deepseek-r1:8b\nPORT=5000\n")
-        print("Created .env file")
 
 if __name__ == "__main__":
     build_backend()

@@ -93,13 +93,6 @@ def setup_electron():
     
     shutil.copy("package.json", "package.json.bak")
     shutil.copy("electron-package.json", "package.json")
-    
-    # Create backend directory for Electron resources
-    backend_dir = os.path.join(os.getcwd(), "backend")
-    if not os.path.exists(backend_dir):
-        os.makedirs(backend_dir)
-    
-    return backend_dir
 
 def restore_package_json():
     # Restore the original package.json

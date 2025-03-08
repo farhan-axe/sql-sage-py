@@ -4,8 +4,17 @@ from fastapi.middleware.cors import CORSMiddleware
 import logging
 import os
 import sys
+import platform
 from dotenv import load_dotenv
 import traceback
+
+# Print diagnostic information on startup
+print(f"Python executable: {sys.executable}")
+print(f"Python version: {sys.version}")
+print(f"System platform: {platform.platform()}")
+print(f"Current directory: {os.getcwd()}")
+print(f"PYTHONPATH: {os.environ.get('PYTHONPATH', 'Not set')}")
+print(f"PATH: {os.environ.get('PATH', 'Not set')[:200]}...") # Show first 200 chars of PATH
 
 # Import modules with error handling
 try:
