@@ -163,9 +163,31 @@ const Index = () => {
     databaseInfo.queryExamples.includes("Could not generate examples");
 
   useEffect(() => {
-    if (databaseInfo && databaseInfo.queryExamples && !databaseInfo.queryExamples.includes("provide me list of products, sales territory")) {
+    if (databaseInfo && databaseInfo.connectionConfig && databaseInfo.connectionConfig.database) {
       const dbName = databaseInfo.connectionConfig.database;
-      const productSalesExample = `
+      
+      // Check if the product sales example exists but has the wrong database name
+      if (databaseInfo.queryExamples && databaseInfo.queryExamples.includes("provide me list of products, sales territory")) {
+        // Replace the hardcoded "Ignite" database name with the current database name in the products/sales example
+        const updatedExamples = databaseInfo.queryExamples.replace(
+          /FROM \[(Ignite|AdventureWorksDW2017|[^\]]+)\]\.\[dbo\]\.\[DimProduct\]/g, 
+          `FROM [${dbName}].[dbo].[DimProduct]`
+        ).replace(
+          /JOIN \[(Ignite|AdventureWorksDW2017|[^\]]+)\]\.\[dbo\]\.\[FactInternetSales\]/g, 
+          `JOIN [${dbName}].[dbo].[FactInternetSales]`
+        ).replace(
+          /JOIN \[(Ignite|AdventureWorksDW2017|[^\]]+)\]\.\[dbo\]\.\[DimSalesTerritory\]/g, 
+          `JOIN [${dbName}].[dbo].[DimSalesTerritory]`
+        );
+        
+        // Update the database info with corrected example queries
+        setDatabaseInfo({
+          ...databaseInfo,
+          queryExamples: updatedExamples
+        });
+      } else if (databaseInfo.queryExamples && !databaseInfo.queryExamples.includes("provide me list of products, sales territory")) {
+        // If the example doesn't exist, add it with the correct database name
+        const productSalesExample = `
       
 ${databaseInfo.queryExamples.split('\n\n').filter(e => e.trim()).length + 1}. provide me list of products, sales territory country name and their sales amount?,
 Your SQL Query will be like "SELECT TOP 200 
@@ -177,13 +199,14 @@ JOIN [${dbName}].[dbo].[FactInternetSales] f ON p.ProductKey = f.ProductKey
 JOIN [${dbName}].[dbo].[DimSalesTerritory] st ON st.SalesTerritoryKey = f.SalesTerritoryKey
 GROUP BY p.EnglishProductName, st.SalesTerritoryCountry;"
 `;
-      
-      setDatabaseInfo({
-        ...databaseInfo,
-        queryExamples: databaseInfo.queryExamples + productSalesExample
-      });
+        
+        setDatabaseInfo({
+          ...databaseInfo,
+          queryExamples: databaseInfo.queryExamples + productSalesExample
+        });
+      }
     }
-  }, [databaseInfo]);
+  }, [databaseInfo?.connectionConfig?.database]);
 
   return (
     <div className="min-h-screen flex">
