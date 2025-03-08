@@ -6,6 +6,7 @@ import logging
 from typing import Optional, Dict, Any, List
 import database
 import query_generation
+from src.services.sql.utils import isNonSqlResponse
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -163,6 +164,14 @@ async def generate_query(request: QueryGenerationRequest):
     returning ONLY the SQL string. (Does NOT execute it.)
     """
     try:
+        # Check if the question is not related to database content
+        if isNonSqlResponse(request.question):
+            logger.warning(f"❌ Non-database question detected: {request.question}")
+            raise HTTPException(
+                status_code=400,
+                detail="This appears to be a general knowledge question not related to database content."
+            )
+            
         logger.info("🔄 Generating SQL query...")
         
         # Create a well-formatted prompt for query generation

@@ -26,6 +26,13 @@ def extract_sql_from_response(response_text: str) -> tuple[Optional[str], Option
         sql_query = match.group(1).strip()
         return sql_query, None  # Return the SQL query and no error
 
+    # Extract from SQL code blocks if not found in the previous format
+    sql_matches = re.findall(r"```sql\s*(.*?)\s*```", response_text, flags=re.DOTALL)
+    query = sql_matches[-1].strip() if sql_matches else None
+    
+    if query:
+        return query, None
+
     return None, "No SQL query found in the model's response."  # Indicate that no query was found
 
 def format_query_examples(database_name: str, query_examples: str) -> str:

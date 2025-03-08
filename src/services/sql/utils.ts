@@ -36,10 +36,10 @@ export const isNonSqlResponse = (text: string): boolean => {
     "prick", "bollocks"
   ];
   
-  // Add political and general knowledge indicators
-  // Completely removing demographic terms that might be used in valid database queries
-  const nonDatabaseTopics = [
+  // Add political and general knowledge indicators with stronger matching patterns
+  const politicalTerms = [
     "president",
+    "prime minister",
     "minister",
     "government",
     "country",
@@ -48,7 +48,6 @@ export const isNonSqlResponse = (text: string): boolean => {
     "leader",
     "nation",
     "capital",
-    "prime minister",
     "king",
     "queen",
     "mayor",
@@ -62,7 +61,35 @@ export const isNonSqlResponse = (text: string): boolean => {
     "democratic",
     "party",
     "vote",
-    "constitution",
+    "constitution"
+  ];
+  
+  const countryNames = [
+    "pakistan",
+    "india",
+    "china",
+    "usa",
+    "united states",
+    "russia",
+    "europe",
+    "africa",
+    "asia",
+    "america",
+    "canada",
+    "australia",
+    "japan",
+    "germany",
+    "france",
+    "uk",
+    "united kingdom",
+    "brazil",
+    "mexico"
+  ];
+  
+  // Non-database topics combined from political terms and other general knowledge areas
+  const nonDatabaseTopics = [
+    ...politicalTerms,
+    ...countryNames,
     "history",
     "war",
     "weather",
@@ -74,14 +101,6 @@ export const isNonSqlResponse = (text: string): boolean => {
     "music",
     "actor",
     "singer",
-    "pakistan",
-    "india",
-    "china",
-    "usa",
-    "united states",
-    "europe",
-    "africa",
-    "asia",
     "religion",
     "religious",
     "islam",
@@ -106,6 +125,20 @@ export const isNonSqlResponse = (text: string): boolean => {
     /where is (?!the location|the address|the store|the customer|the product|the user|the person|the employee)/i,
     /how many people (?!purchased|ordered|returned|visited|registered|are|with|having|above|below|between|older|younger|male|female|age)/i,
     /tell me about (?!the data|the table|the schema|the query|the result|the database|the customers|the users|the employees|the people|age|gender)/i
+  ];
+  
+  // Add specific political question patterns to catch questions like "who is the president of X"
+  const politicalQuestionPatterns = [
+    /who is the president/i,
+    /who is president/i,
+    /current president/i,
+    /who is the prime minister/i,
+    /who is prime minister/i,
+    /who (leads|runs|governs)/i,
+    /who is the (leader|ruler|king|queen)/i,
+    /capital of/i,
+    /largest city in/i,
+    /population of/i
   ];
   
   // Common database-related terms for demographic analysis
@@ -142,6 +175,11 @@ export const isNonSqlResponse = (text: string): boolean => {
     pattern.test(normalizedText)
   );
   
+  // Check specifically for political questions patterns
+  const hasPoliticalQuestionPattern = politicalQuestionPatterns.some(pattern =>
+    pattern.test(normalizedText)
+  );
+  
   // Check if the question might be related to demographic data
   const hasDemographicTerms = demographicDataTerms.some(term => 
     normalizedText.includes(term.toLowerCase())
@@ -160,10 +198,18 @@ export const isNonSqlResponse = (text: string): boolean => {
     "alter", "drop", "view", "index", "procedure", "function", "trigger"
   ];
   
-  // If the question contains database terms or demographic terms, don't block it
+  // Check for presence of database schema/table names in the question
+  // This helps identify if the question is referencing actual database objects
   const hasDatabaseTerms = databaseRelatedTerms.some(term => 
     normalizedText.includes(term.toLowerCase())
   );
+  
+  // Special handling for political questions about countries
+  // If we detect both political patterns and country names, it's likely a factual question
+  if (hasPoliticalQuestionPattern && 
+      countryNames.some(country => normalizedText.includes(country.toLowerCase()))) {
+    return true; // Block political questions about countries
+  }
   
   // Give special treatment to questions that clearly contain demographic terms
   if (hasDemographicTerms) {
@@ -171,11 +217,16 @@ export const isNonSqlResponse = (text: string): boolean => {
     return hasProfanity || (hasNonDatabaseTopic && !hasDatabaseTerms);
   }
   
-  // If the question contains other database terms, don't block it either
-  if (hasDatabaseTerms) {
+  // If the question contains other database terms, don't block it
+  if (hasDatabaseTerms && !hasPoliticalQuestionPattern) {
     return false;
   }
   
   // Block if it matches any non-SQL indicator, topic, pattern, or contains profanity
-  return hasNonSqlIndicator || hasNonDatabaseTopic || hasGeneralPattern || hasProfanity;
+  return hasNonSqlIndicator || 
+         hasNonDatabaseTopic || 
+         hasGeneralPattern || 
+         hasPoliticalQuestionPattern || 
+         hasProfanity;
 };
+

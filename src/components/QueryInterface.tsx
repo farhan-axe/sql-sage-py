@@ -35,10 +35,10 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate, onSaveQ
     
     if (isNonSqlResponse(text)) {
       console.log("Non-database question detected:", text);
-      setQueryError("This question does not appear to be related to database content. Please ask a question about the data in your connected database.");
+      setQueryError("This appears to be a general knowledge question not related to your database. Please ask a question about the data in your connected database.");
       toast({
         title: "Non-database question detected",
-        description: "Please ask a question about your database content",
+        description: "Please ask a question related to your database content",
         variant: "destructive",
       });
       setGeneratedQuery("");
