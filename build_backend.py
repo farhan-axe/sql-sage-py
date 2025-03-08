@@ -11,8 +11,19 @@ def build_backend():
     """
     print("Preparing backend files for packaging...")
     
-    # Get the backend directory path (one level up from current directory, then into 'backend')
-    source_backend_dir = os.path.join(os.path.dirname(os.getcwd()), "backend")
+    # Get the current directory (should be frontend/sql-sage-py)
+    current_dir = os.getcwd()
+    
+    # Go up one level to the parent directory (should be the 'frontend' directory)
+    parent_dir = os.path.dirname(current_dir)
+    
+    # Go up one more level to the root project directory
+    project_root = os.path.dirname(parent_dir)
+    
+    # Path to the actual backend directory
+    source_backend_dir = os.path.join(project_root, "backend")
+    
+    print(f"Looking for backend directory at: {source_backend_dir}")
     
     # Create a local backend directory for packaging
     backend_dir = os.path.join(os.getcwd(), "backend")
@@ -22,7 +33,26 @@ def build_backend():
     # Check if source backend directory exists
     if not os.path.exists(source_backend_dir):
         print(f"Warning: Backend directory not found at {source_backend_dir}")
-        return backend_dir
+        print("Attempting to find backend directory in alternative locations...")
+        
+        # Try other potential locations
+        alternative_locations = [
+            os.path.join(os.path.dirname(os.getcwd()), "backend"),  # frontend/backend
+            os.path.join(os.getcwd(), "..", "..", "backend"),       # Alternative path format
+            os.path.join(os.getcwd(), "..", "backend"),            # Another alternative
+            os.path.abspath(os.path.join(os.getcwd(), "..", "..", "backend"))  # Absolute path
+        ]
+        
+        for location in alternative_locations:
+            print(f"Checking {location}...")
+            if os.path.exists(location):
+                source_backend_dir = location
+                print(f"Found backend directory at: {source_backend_dir}")
+                break
+        else:
+            print("ERROR: Could not find backend directory in any expected location.")
+            print("Please make sure the backend directory exists and contains sql.py")
+            return backend_dir
     
     # Copy all Python files and .env file from the backend directory
     backend_files = [f for f in os.listdir(source_backend_dir) if f.endswith('.py') or f == '.env']
@@ -124,3 +154,4 @@ if __name__ == "__main__":
 
 if __name__ == "__main__":
     build_backend()
+

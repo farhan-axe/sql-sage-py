@@ -4,6 +4,7 @@ import sys
 import shutil
 import subprocess
 import platform
+from build_backend import build_backend
 
 def find_npm():
     """Find the npm executable based on the platform."""
@@ -106,123 +107,11 @@ def restore_package_json():
         shutil.copy("package.json.bak", "package.json")
         os.remove("package.json.bak")
 
-def copy_backend_files():
-    """Copy backend files to the Electron backend directory."""
-    print("Copying backend files...")
-    
-    # Get the backend directory path (one level up from current directory, then into 'backend')
-    source_backend_dir = os.path.join(os.path.dirname(os.getcwd()), "backend")
-    
-    # Create destination backend directory
-    dest_backend_dir = os.path.join(os.getcwd(), "backend")
-    if not os.path.exists(dest_backend_dir):
-        os.makedirs(dest_backend_dir)
-    
-    # Check if source backend directory exists
-    if not os.path.exists(source_backend_dir):
-        print(f"Warning: Backend directory not found at {source_backend_dir}")
-        return dest_backend_dir
-    
-    # Copy all Python files and .env file from the backend directory
-    backend_files = [f for f in os.listdir(source_backend_dir) if f.endswith('.py') or f == '.env']
-    for file in backend_files:
-        src_file = os.path.join(source_backend_dir, file)
-        dest_file = os.path.join(dest_backend_dir, file)
-        shutil.copy2(src_file, dest_file)
-        print(f"Copied {file} to backend directory")
-    
-    # Copy requirements.txt if it exists
-    req_file = os.path.join(source_backend_dir, "requirements.txt")
-    if os.path.exists(req_file):
-        shutil.copy2(req_file, os.path.join(dest_backend_dir, "requirements.txt"))
-        print("Copied requirements.txt to backend directory")
-    
-    # Create a simple launcher script that will run sql.py
-    backend_launcher = os.path.join(dest_backend_dir, "run_backend.py")
-    with open(backend_launcher, 'w') as f:
-        f.write("""
-import os
-import sys
-import subprocess
-
-def run_backend():
-    # Get the directory where this script is located
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    
-    # Add the script directory to Python's path
-    if script_dir not in sys.path:
-        sys.path.insert(0, script_dir)
-    
-    # Change to the script directory
-    os.chdir(script_dir)
-    
-    # Print diagnostic information
-    print(f"Working directory: {os.getcwd()}")
-    print(f"Python executable: {sys.executable}")
-    print(f"Python version: {sys.version}")
-    print(f"Python path: {sys.path}")
-    
-    try:
-        # Try to import required packages
-        import uvicorn
-        import fastapi
-        print("Successfully imported required packages")
-    except ImportError as e:
-        print(f"Error importing required packages: {e}")
-        print("Attempting to install missing packages...")
-        try:
-            # Check if requirements.txt exists
-            req_file = os.path.join(script_dir, "requirements.txt")
-            if os.path.exists(req_file):
-                subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", req_file])
-            else:
-                # Install minimum required packages
-                subprocess.check_call([sys.executable, "-m", "pip", "install", "fastapi", "uvicorn", "pyodbc", "requests"])
-            print("Package installation complete. Retrying import...")
-            import uvicorn
-            import fastapi
-        except Exception as e:
-            print(f"Failed to install required packages: {e}")
-            sys.exit(1)
-    
-    # Check if sql.py exists in the current directory
-    if os.path.exists(os.path.join(script_dir, "sql.py")):
-        module_name = "sql"
-    elif os.path.exists(os.path.join(script_dir, "main.py")):
-        module_name = "main"
-    else:
-        print(f"Error: Neither sql.py nor main.py found in {script_dir}")
-        sys.exit(1)
-    
-    print(f"Starting {module_name}.py...")
-    
-    # Import and run the module
-    try:
-        __import__(module_name)
-        print(f"{module_name} module imported successfully")
-    except Exception as e:
-        print(f"Error importing {module_name}: {e}")
-        # If import fails, try running it as a subprocess
-        try:
-            print(f"Attempting to run {module_name}.py as a subprocess...")
-            script_path = os.path.join(script_dir, f"{module_name}.py")
-            subprocess.call([sys.executable, script_path])
-        except Exception as e:
-            print(f"Error running {module_name}.py as subprocess: {e}")
-            sys.exit(1)
-
-if __name__ == "__main__":
-    run_backend()
-""")
-    
-    print("Created backend launcher script")
-    return dest_backend_dir
-
 def build_electron_app():
     print("Building Electron app...")
     
-    # Copy backend files to the backend directory
-    backend_dir = copy_backend_files()
+    # Build backend using the improved build_backend function
+    backend_dir = build_backend()
     
     npm_cmd = find_npm()
     
