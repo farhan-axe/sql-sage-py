@@ -106,38 +106,48 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate, onSaveQ
   };
 
   const extractSQLQuery = (text: string): string => {
+    console.log("Extracting SQL from:", text.substring(0, 200) + "...");
+    
     const queryFormatMatch = text.match(/Your SQL Query will be like "([\s\S]*?)"/i);
     if (queryFormatMatch) {
-      return queryFormatMatch[1].trim();
+      const extracted = queryFormatMatch[1].trim();
+      console.log("Extracted from 'Your SQL Query will be like' format:", extracted);
+      return extracted;
     }
     
     const sqlBlockMatch = text.match(/```sql\s*([\s\S]*?)\s*```/i);
     if (sqlBlockMatch) {
-      return sqlBlockMatch[1].trim();
+      const extracted = sqlBlockMatch[1].trim();
+      console.log("Extracted from SQL code block:", extracted);
+      return extracted;
     }
-
-    const sqlPattern = /\b(SELECT|WITH)\b[\s\S]*?(?:;|\n\s*\n|$)/i;
-    const sqlMatch = text.match(sqlPattern);
     
+    const sqlPattern = /\b(SELECT|WITH)\b[\s\S]*?(;|\n\s*\n|$)/i;
+    const sqlMatch = text.match(sqlPattern);
     if (sqlMatch) {
-      const rawQuery = sqlMatch[0];
-      const cleanedLines = rawQuery.split('\n')
+      const extracted = sqlMatch[0].trim().replace(/;$/, '');
+      console.log("Extracted using SQL pattern regex:", extracted);
+      
+      const cleanedQuery = extracted.split('\n')
         .filter(line => {
           const trimmedLine = line.trim().toLowerCase();
           return trimmedLine !== '' && 
                 !trimmedLine.includes('here is') && 
                 !trimmedLine.includes('query:') && 
                 !trimmedLine.includes('sql query:');
-        });
+        })
+        .join('\n')
+        .trim();
       
-      return cleanedLines.join('\n').trim();
+      console.log("Cleaned extracted query:", cleanedQuery);
+      return cleanedQuery;
     }
     
     const sqlKeywordsStart = ['SELECT', 'WITH'];
     const lines = text.split('\n');
     let queryLines = [];
     let inQuery = false;
-    let openParenCount = 0;
+    let bracketBalance = 0;
     
     for (const line of lines) {
       const trimmedLine = line.trim();
@@ -146,10 +156,10 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate, onSaveQ
       if (!inQuery && sqlKeywordsStart.some(keyword => upperLine.startsWith(keyword))) {
         inQuery = true;
       }
-
+      
       if (inQuery) {
-        openParenCount += (trimmedLine.match(/\(/g) || []).length;
-        openParenCount -= (trimmedLine.match(/\)/g) || []).length;
+        bracketBalance += (trimmedLine.match(/\(/g) || []).length;
+        bracketBalance -= (trimmedLine.match(/\)/g) || []).length;
         
         if (trimmedLine !== '' && 
             !trimmedLine.toLowerCase().includes('here') &&
@@ -157,20 +167,20 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate, onSaveQ
             !trimmedLine.toLowerCase().includes('sql query:')) {
           queryLines.push(line);
         }
-      }
-      
-      if (inQuery && (
-          trimmedLine.endsWith(';') || 
-          (openParenCount <= 0 && (
-            lines.indexOf(line) === lines.length - 1 || 
-            (lines.indexOf(line) + 1 < lines.length && lines[lines.indexOf(line) + 1].trim() === '')
-          ))
-        )) {
-        break;
+        
+        if (trimmedLine.endsWith(';') || 
+            (bracketBalance <= 0 && (
+              lines.indexOf(line) === lines.length - 1 || 
+              (lines.indexOf(line) + 1 < lines.length && lines[lines.indexOf(line) + 1].trim() === '')
+            ))) {
+          break;
+        }
       }
     }
-
-    return queryLines.join('\n').trim();
+    
+    const result = queryLines.join('\n').trim();
+    console.log("Fallback extraction result:", result);
+    return result;
   };
 
   const formatQueryWithDatabasePrefix = (query: string): string => {
@@ -292,7 +302,7 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate, onSaveQ
         onQueryGenerated(timeElapsed);
       }
       
-      console.log("Generated response:", generatedData.query);
+      console.log("Generated response from backend:", generatedData.query);
       console.log(`Query generation took ${timeElapsed}ms`);
       
       if (isNonSqlResponse(generatedData.query)) {
@@ -307,20 +317,20 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate, onSaveQ
         return;
       }
       
-      const cleanedQuery = extractSQLQuery(generatedData.query);
-      console.log("Extracted SQL query:", cleanedQuery);
+      const extractedQuery = extractSQLQuery(generatedData.query);
+      console.log("Extracted SQL query:", extractedQuery);
       
-      if (!cleanedQuery) {
+      if (!extractedQuery) {
         throw new Error('Failed to extract a valid SQL query from the response');
       }
       
-      let finalQuery = cleanedQuery;
+      let finalQuery = extractedQuery;
       if (finalQuery.toUpperCase().trim().startsWith('SELECT') && 
           !finalQuery.toUpperCase().includes('TOP ')) {
         finalQuery = finalQuery.replace(/\bSELECT\b\s+/i, 'SELECT TOP 200 ');
       }
       
-      console.log("Final query after TOP 200 injection:", finalQuery);
+      console.log("Final query after TOP 200 injection (if needed):", finalQuery);
       
       const formattedQuery = formatQueryWithDatabasePrefix(finalQuery);
       console.log("Formatted query with database prefix:", formattedQuery);
