@@ -38,9 +38,89 @@ def build_backend():
         shutil.copy2(req_file, os.path.join(backend_dir, "requirements.txt"))
         print("Copied requirements.txt to local backend directory")
     
-    # We don't need PyInstaller, so we'll just return the path to our backend directory
+    # Create a run_backend.py file which will be our entry point
+    create_backend_launcher(backend_dir)
+    
     print("Backend preparation complete!")
     return backend_dir
+
+def create_backend_launcher(backend_dir):
+    """Create a launcher script that will run sql.py"""
+    backend_launcher = os.path.join(backend_dir, "run_backend.py")
+    
+    with open(backend_launcher, 'w') as f:
+        f.write("""
+import os
+import sys
+import subprocess
+
+def run_backend():
+    # Get the directory where this script is located
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    
+    # Add the script directory to Python's path
+    if script_dir not in sys.path:
+        sys.path.insert(0, script_dir)
+    
+    # Change to the script directory
+    os.chdir(script_dir)
+    
+    # Print diagnostic information
+    print(f"Working directory: {os.getcwd()}")
+    print(f"Python executable: {sys.executable}")
+    print(f"Python version: {sys.version}")
+    print(f"Python path: {sys.path}")
+    
+    try:
+        # Try to import required packages
+        import uvicorn
+        import fastapi
+        print("Successfully imported required packages")
+    except ImportError as e:
+        print(f"Error importing required packages: {e}")
+        print("Attempting to install missing packages...")
+        try:
+            # Check if requirements.txt exists
+            req_file = os.path.join(script_dir, "requirements.txt")
+            if os.path.exists(req_file):
+                subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", req_file])
+            else:
+                # Install minimum required packages
+                subprocess.check_call([sys.executable, "-m", "pip", "install", "fastapi", "uvicorn", "pyodbc", "requests"])
+            print("Package installation complete. Retrying import...")
+            import uvicorn
+            import fastapi
+        except Exception as e:
+            print(f"Failed to install required packages: {e}")
+            sys.exit(1)
+    
+    # Check if sql.py exists in the current directory
+    sql_path = os.path.join(script_dir, "sql.py")
+    if not os.path.exists(sql_path):
+        print(f"Error: sql.py not found at {sql_path}")
+        sys.exit(1)
+    
+    print(f"Starting SQL Server API from {sql_path}...")
+    
+    # Import and run the sql.py script
+    try:
+        import sql
+        print("SQL module imported successfully")
+    except Exception as e:
+        print(f"Error importing sql.py: {e}")
+        # If import fails, try running it as a subprocess
+        try:
+            print("Attempting to run sql.py as a subprocess...")
+            subprocess.call([sys.executable, sql_path])
+        except Exception as e:
+            print(f"Error running sql.py as subprocess: {e}")
+            sys.exit(1)
+
+if __name__ == "__main__":
+    run_backend()
+""")
+    
+    print(f"Created backend launcher script at {backend_launcher}")
 
 if __name__ == "__main__":
     build_backend()

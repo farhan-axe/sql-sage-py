@@ -1,3 +1,4 @@
+
 import os
 import sys
 import shutil
@@ -148,11 +149,67 @@ def run_backend():
     # Get the directory where this script is located
     script_dir = os.path.dirname(os.path.abspath(__file__))
     
+    # Add the script directory to Python's path
+    if script_dir not in sys.path:
+        sys.path.insert(0, script_dir)
+    
     # Change to the script directory
     os.chdir(script_dir)
     
-    # Run the sql.py script
-    subprocess.call([sys.executable, "sql.py"])
+    # Print diagnostic information
+    print(f"Working directory: {os.getcwd()}")
+    print(f"Python executable: {sys.executable}")
+    print(f"Python version: {sys.version}")
+    print(f"Python path: {sys.path}")
+    
+    try:
+        # Try to import required packages
+        import uvicorn
+        import fastapi
+        print("Successfully imported required packages")
+    except ImportError as e:
+        print(f"Error importing required packages: {e}")
+        print("Attempting to install missing packages...")
+        try:
+            # Check if requirements.txt exists
+            req_file = os.path.join(script_dir, "requirements.txt")
+            if os.path.exists(req_file):
+                subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", req_file])
+            else:
+                # Install minimum required packages
+                subprocess.check_call([sys.executable, "-m", "pip", "install", "fastapi", "uvicorn", "pyodbc", "requests"])
+            print("Package installation complete. Retrying import...")
+            import uvicorn
+            import fastapi
+        except Exception as e:
+            print(f"Failed to install required packages: {e}")
+            sys.exit(1)
+    
+    # Check if sql.py exists in the current directory
+    if os.path.exists(os.path.join(script_dir, "sql.py")):
+        module_name = "sql"
+    elif os.path.exists(os.path.join(script_dir, "main.py")):
+        module_name = "main"
+    else:
+        print(f"Error: Neither sql.py nor main.py found in {script_dir}")
+        sys.exit(1)
+    
+    print(f"Starting {module_name}.py...")
+    
+    # Import and run the module
+    try:
+        __import__(module_name)
+        print(f"{module_name} module imported successfully")
+    except Exception as e:
+        print(f"Error importing {module_name}: {e}")
+        # If import fails, try running it as a subprocess
+        try:
+            print(f"Attempting to run {module_name}.py as a subprocess...")
+            script_path = os.path.join(script_dir, f"{module_name}.py")
+            subprocess.call([sys.executable, script_path])
+        except Exception as e:
+            print(f"Error running {module_name}.py as subprocess: {e}")
+            sys.exit(1)
 
 if __name__ == "__main__":
     run_backend()
@@ -181,13 +238,31 @@ def build_electron_app():
         print(f"Running Electron build command: {' '.join(electron_build_cmd)}")
         
         try:
+            # First try building without CSC_IDENTITY_AUTO_DISCOVERY=false to skip code signing
+            os.environ["CSC_IDENTITY_AUTO_DISCOVERY"] = "false"
             subprocess.check_call(electron_build_cmd)
         except subprocess.CalledProcessError as e:
             print(f"Error building Electron app: {e}")
-            print("Trying without code signing...")
-            # Try again with CSC_IDENTITY_AUTO_DISCOVERY=false to skip code signing
-            os.environ["CSC_IDENTITY_AUTO_DISCOVERY"] = "false"
-            subprocess.check_call(electron_build_cmd)
+            print("Trying with alternative build configuration...")
+            
+            # Try with different configuration
+            try:
+                # Try building with --x64 flag
+                electron_build_cmd.append("--x64")
+                subprocess.check_call(electron_build_cmd)
+            except subprocess.CalledProcessError as e:
+                print(f"Error building Electron app with x64 flag: {e}")
+                print("Creating fallback package directory...")
+                # Create a simple directory structure as a fallback
+                fallback_dir = os.path.join(os.getcwd(), "electron-dist", "win-unpacked")
+                if not os.path.exists(fallback_dir):
+                    os.makedirs(fallback_dir)
+                # Copy dist to fallback dir
+                if os.path.exists("dist"):
+                    shutil.copytree("dist", os.path.join(fallback_dir, "resources", "app", "dist"), dirs_exist_ok=True)
+                # Copy electron.js to fallback dir
+                shutil.copy("electron.js", os.path.join(fallback_dir, "resources", "app", "electron.js"))
+                return fallback_dir
         
         print("Electron app build complete!")
         
@@ -224,6 +299,9 @@ Before running SQL Sage, you need to install Ollama and download the required mo
    ollama pull deepseek-r1:14b
 
 3. Make sure Ollama is running before launching SQL Sage.
+   On Windows, you should see the Ollama icon in your system tray.
+   On macOS, Ollama should appear in your menu bar.
+   On Linux, run 'ollama serve' if it's not already running.
 
 4. You can customize the model by editing the .env file in the application directory.
 """
@@ -278,6 +356,14 @@ def package_application():
             shutil.rmtree(backend_dest)
         
         shutil.copytree(os.path.join(os.getcwd(), "backend"), backend_dest)
+        
+        # Copy electron.js as main.js if it doesn't exist
+        electron_js_path = os.path.join(final_package_path, "resources", "app", "electron.js")
+        main_js_path = os.path.join(final_package_path, "resources", "app", "main.js")
+        
+        if os.path.exists(electron_js_path) and not os.path.exists(main_js_path):
+            os.makedirs(os.path.dirname(main_js_path), exist_ok=True)
+            shutil.copy(electron_js_path, main_js_path)
         
         print(f"\n✅ Packaging complete! Your application is ready in: {final_package_path}")
         print("   Share this folder with users who want to run SQL Sage.")
