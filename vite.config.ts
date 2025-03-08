@@ -1,7 +1,7 @@
+
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
-import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
@@ -11,12 +11,26 @@ export default defineConfig(({ mode }) => ({
   },
   plugins: [
     react(),
-    mode === 'development' &&
-    componentTagger(),
+    // Only include componentTagger in development mode if it's available
+    mode === 'development' && 
+    (() => {
+      try {
+        return require("lovable-tagger").componentTagger();
+      } catch (error) {
+        // If lovable-tagger is not available, return null
+        console.warn("lovable-tagger not found, skipping...");
+        return null;
+      }
+    })(),
   ].filter(Boolean),
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  // Make sure the build is in the right place for Electron
+  build: {
+    outDir: "dist",
+    emptyOutDir: true,
+  }
 }));
