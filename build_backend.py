@@ -200,7 +200,7 @@ def create_backend_launcher(backend_dir, has_source=True, python_path=None):
     if not python_path:
         python_path = sys.executable
     
-    # We'll write the file content with explicit string concatenation to avoid f-string syntax errors
+    # We'll write the launcher content in smaller chunks to avoid string formatting issues
     launcher_content = """
 import os
 import sys
@@ -228,7 +228,10 @@ POTENTIAL_CONDA_PATHS = [
 ]
 
 def check_ollama_running(host="localhost", port=11434):
-    """Check if Ollama server is running by attempting to connect to its port."""
+"""
+    
+    # Add the docstring for check_ollama_running as a separate string to avoid formatting issues
+    launcher_content += """    \"\"\"Check if Ollama server is running by attempting to connect to its port.\"\"\"
     try:
         # Try to create a socket connection to the Ollama server
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -239,7 +242,10 @@ def check_ollama_running(host="localhost", port=11434):
         return False  # Any exception means Ollama is not accessible
 
 def find_python_executable():
-    """Find the Python executable to use."""
+"""
+
+    # Add the docstring for find_python_executable as a separate string
+    launcher_content += """    \"\"\"Find the Python executable to use.\"\"\"
     # First try the hard-coded path from build time
     if os.path.exists(CONDA_PYTHON_PATH):
         print(f"Using conda Python: {CONDA_PYTHON_PATH}")
@@ -256,7 +262,10 @@ def find_python_executable():
         if os.path.exists(conda_python):
             print(f"Found conda Python: {conda_python}")
             return conda_python
-            
+"""
+
+    # Continue with the rest of the launcher content
+    launcher_content += """            
     # Try to get conda environments
     try:
         # Try to detect conda environments using conda command
@@ -340,6 +349,10 @@ def find_python_executable():
     return "python" if platform.system() == "Windows" else "python3"
 
 def run_backend():
+"""
+
+    # Add the rest of the run_backend function
+    launcher_content += """
     # Get the directory where this script is located
     script_dir = os.path.dirname(os.path.abspath(__file__))
     
