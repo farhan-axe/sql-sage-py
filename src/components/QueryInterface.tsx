@@ -116,6 +116,23 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate, onSaveQ
       return sqlBlockMatch[1].trim();
     }
 
+    const sqlPattern = /\b(SELECT|WITH)\b[\s\S]*?(?:;|\n\s*\n|$)/i;
+    const sqlMatch = text.match(sqlPattern);
+    
+    if (sqlMatch) {
+      const rawQuery = sqlMatch[0];
+      const cleanedLines = rawQuery.split('\n')
+        .filter(line => {
+          const trimmedLine = line.trim().toLowerCase();
+          return trimmedLine !== '' && 
+                !trimmedLine.includes('here is') && 
+                !trimmedLine.includes('query:') && 
+                !trimmedLine.includes('sql query:');
+        });
+      
+      return cleanedLines.join('\n').trim();
+    }
+    
     const sqlKeywordsStart = ['SELECT', 'WITH'];
     const lines = text.split('\n');
     let queryLines = [];
@@ -133,20 +150,22 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate, onSaveQ
       if (inQuery) {
         openParenCount += (trimmedLine.match(/\(/g) || []).length;
         openParenCount -= (trimmedLine.match(/\)/g) || []).length;
+        
+        if (trimmedLine !== '' && 
+            !trimmedLine.toLowerCase().includes('here') &&
+            !trimmedLine.toLowerCase().includes('query:') &&
+            !trimmedLine.toLowerCase().includes('sql query:')) {
+          queryLines.push(line);
+        }
       }
       
-      if (inQuery && 
-          trimmedLine !== '' && 
-          !trimmedLine.toLowerCase().includes('here') &&
-          !trimmedLine.toLowerCase().includes('query:') &&
-          !trimmedLine.toLowerCase().includes('sql query:')) {
-        queryLines.push(line);
-      }
-      
-      if (inQuery && openParenCount === 0 && 
-          (trimmedLine.endsWith(';') || 
-           (lines.indexOf(line) === lines.length - 1) || 
-           lines[lines.indexOf(line) + 1].trim() === '')) {
+      if (inQuery && (
+          trimmedLine.endsWith(';') || 
+          (openParenCount <= 0 && (
+            lines.indexOf(line) === lines.length - 1 || 
+            (lines.indexOf(line) + 1 < lines.length && lines[lines.indexOf(line) + 1].trim() === '')
+          ))
+        )) {
         break;
       }
     }
@@ -289,7 +308,7 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate, onSaveQ
       }
       
       const cleanedQuery = extractSQLQuery(generatedData.query);
-      console.log("Cleaned query:", cleanedQuery);
+      console.log("Extracted SQL query:", cleanedQuery);
       
       if (!cleanedQuery) {
         throw new Error('Failed to extract a valid SQL query from the response');
@@ -298,8 +317,10 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate, onSaveQ
       let finalQuery = cleanedQuery;
       if (finalQuery.toUpperCase().trim().startsWith('SELECT') && 
           !finalQuery.toUpperCase().includes('TOP ')) {
-        finalQuery = finalQuery.replace(/SELECT\s+/i, 'SELECT TOP 200 ');
+        finalQuery = finalQuery.replace(/\bSELECT\b\s+/i, 'SELECT TOP 200 ');
       }
+      
+      console.log("Final query after TOP 200 injection:", finalQuery);
       
       const formattedQuery = formatQueryWithDatabasePrefix(finalQuery);
       console.log("Formatted query with database prefix:", formattedQuery);
