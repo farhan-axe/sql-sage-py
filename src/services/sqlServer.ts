@@ -570,7 +570,7 @@ export const isNonSqlResponse = (text: string): boolean => {
   ];
   
   // Add political and general knowledge indicators
-  // Removing terms like "age", "gender" from non-database topics
+  // Completely removing demographic terms that might be used in valid database queries
   const nonDatabaseTopics = [
     "president",
     "minister",
@@ -631,22 +631,28 @@ export const isNonSqlResponse = (text: string): boolean => {
   ];
   
   // Check for common question patterns that are not database-related
-  // Modified to exclude patterns with database-relevant terms
+  // Improved to exclude database-relevant patterns, especially for demographic data
   const generalKnowledgePatterns = [
-    /who is (?!in|from|has|with|the|less|more|highest|lowest)/i,
-    /what is (?!the count|the sum|the average|the min|the max|in|from|has|with|the|less|more|highest|lowest)/i,
-    /when did (?!the transaction|the sale|the event|the entry|the record)/i,
-    /where is (?!the location|the address|the store|the customer|the product)/i,
-    /how many people (?!purchased|ordered|returned|visited|registered)/i,
-    /tell me about (?!the data|the table|the schema|the query|the result|the database)/i
+    /who is (?!in|from|has|with|the|less|more|highest|lowest|older|younger|above|below|between|male|female|man|woman|age|having|customer|employee|person|user)/i,
+    /what is (?!the count|the sum|the average|the min|the max|in|from|has|with|the|less|more|highest|lowest|older|younger|above|below|between|male|female|age|man|woman|having|customer|employee|person|user)/i,
+    /when did (?!the transaction|the sale|the event|the entry|the record|the user|the customer|the person|the employee)/i,
+    /where is (?!the location|the address|the store|the customer|the product|the user|the person|the employee)/i,
+    /how many people (?!purchased|ordered|returned|visited|registered|are|with|having|above|below|between|older|younger|male|female|age)/i,
+    /tell me about (?!the data|the table|the schema|the query|the result|the database|the customers|the users|the employees|the people|age|gender)/i
   ];
   
-  // Add common database-related terms for age/gender analysis
+  // Common database-related terms for demographic analysis
+  // Expanded this list significantly to cover more demographic query scenarios
   const demographicDataTerms = [
     "age", "gender", "sex", "male", "female", 
     "demographic", "man", "woman", "men", "women",
     "boy", "girl", "boys", "girls", "birth", "dob",
-    "date of birth", "year old", "years old"
+    "date of birth", "year old", "years old", "younger than",
+    "older than", "between ages", "age group", "by gender",
+    "by age", "age distribution", "gender distribution",
+    "age range", "under age", "over age", "less than",
+    "more than", "greater than", "show me the age", 
+    "list the age", "find age", "count by age", "group by gender"
   ];
   
   // Check for profanity
@@ -674,21 +680,32 @@ export const isNonSqlResponse = (text: string): boolean => {
     normalizedText.includes(term.toLowerCase())
   );
   
-  // Check if the question might be related to actual data
+  // Added more comprehensive database-related terms including analytical operations
   const databaseRelatedTerms = [
     "table", "database", "sql", "query", "select", "row", "column", 
     "join", "data", "record", "count", "sum", "avg", "where", "from", 
     "group by", "order by", "having", "show me", "less than", "more than",
-    "greater than", "filter", "sort", "list", "display", "find"
+    "greater than", "filter", "sort", "list", "display", "find", "report",
+    "analyze", "between", "who", "what", "when", "how many", "tell me",
+    "top", "bottom", "first", "last", "total", "average", "minimum", "maximum",
+    "highest", "lowest", "equal to", "not equal", "contains", "starts with",
+    "ends with", "like", "and", "or", "insert", "update", "delete", "create",
+    "alter", "drop", "view", "index", "procedure", "function", "trigger"
   ];
   
-  // If there are database-related terms, then it might still be a valid question
+  // If the question contains database terms or demographic terms, don't block it
   const hasDatabaseTerms = databaseRelatedTerms.some(term => 
     normalizedText.includes(term.toLowerCase())
   );
   
-  // If the question contains database terms or demographic terms, don't block it
-  if (hasDatabaseTerms || hasDemographicTerms) {
+  // Give special treatment to questions that clearly contain demographic terms
+  if (hasDemographicTerms) {
+    // If it has demographic terms, only block if it also has profanity or explicit political references
+    return hasProfanity || (hasNonDatabaseTopic && !hasDatabaseTerms);
+  }
+  
+  // If the question contains other database terms, don't block it either
+  if (hasDatabaseTerms) {
     return false;
   }
   
