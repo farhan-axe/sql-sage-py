@@ -2,19 +2,29 @@
 import logging
 import re
 from typing import Optional, Dict, Any, Tuple
+import requests
+import os
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-def query_ollama(prompt: str):
+def query_ollama(prompt: str) -> str:
     """
-    Placeholder function to simulate querying an Ollama model.
-    Replace this with actual Ollama API call.
+    Send a request to the Ollama server for SQL generation.
     """
-    # Simulate an Ollama response (replace with actual API call)
-    # This is just a mock, replace with actual Ollama querying logic
-    return "Your SQL Query will be like \"SELECT * FROM [Database].[dbo].[Customers];\""
+    OLLAMA_URL = "http://localhost:11434/api/generate"
+    MODEL = os.getenv("OLLAMA_MODEL", "deepseek-r1:8b")
+    
+    payload = {"model": MODEL, "prompt": prompt, "stream": False, "temperature": 0.2}
+    try:
+        response = requests.post(OLLAMA_URL, json=payload)
+        response.raise_for_status()
+        response_data = response.json()
+        return response_data.get("response", "").strip()
+    except requests.RequestException as e:
+        logger.error(f"❌ Error querying Ollama: {str(e)}")
+        return None
 
 def extract_sql_from_response(response_text: str) -> tuple[Optional[str], Optional[str]]:
     """
