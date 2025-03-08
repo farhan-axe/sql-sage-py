@@ -116,24 +116,38 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate, onSaveQ
       return sqlBlockMatch[1].trim();
     }
 
-    const sqlKeywords = ['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'WITH'];
+    const sqlKeywordsStart = ['SELECT', 'WITH'];
     const lines = text.split('\n');
-    const queryLines = [];
-    let foundQuery = false;
-
+    let queryLines = [];
+    let inQuery = false;
+    let openParenCount = 0;
+    
     for (const line of lines) {
-      const upperLine = line.toUpperCase().trim();
+      const trimmedLine = line.trim();
+      const upperLine = trimmedLine.toUpperCase();
       
-      if (sqlKeywords.some(keyword => upperLine.startsWith(keyword))) {
-        foundQuery = true;
+      if (!inQuery && sqlKeywordsStart.some(keyword => upperLine.startsWith(keyword))) {
+        inQuery = true;
       }
 
-      if (foundQuery && 
-          line.trim() !== '' && 
-          !line.toLowerCase().includes('here') &&
-          !line.toLowerCase().includes('query:') &&
-          !line.toLowerCase().includes('sql query:')) {
+      if (inQuery) {
+        openParenCount += (trimmedLine.match(/\(/g) || []).length;
+        openParenCount -= (trimmedLine.match(/\)/g) || []).length;
+      }
+      
+      if (inQuery && 
+          trimmedLine !== '' && 
+          !trimmedLine.toLowerCase().includes('here') &&
+          !trimmedLine.toLowerCase().includes('query:') &&
+          !trimmedLine.toLowerCase().includes('sql query:')) {
         queryLines.push(line);
+      }
+      
+      if (inQuery && openParenCount === 0 && 
+          (trimmedLine.endsWith(';') || 
+           (lines.indexOf(line) === lines.length - 1) || 
+           lines[lines.indexOf(line) + 1].trim() === '')) {
+        break;
       }
     }
 
