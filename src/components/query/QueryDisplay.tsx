@@ -46,8 +46,18 @@ const QueryDisplay = ({
   };
 
   const handleSaveQuery = () => {
-    if (!question || !query || !databaseInfo) return;
+    console.log("Save query button clicked", { question, query, databaseInfo });
+    if (!question || !query || !databaseInfo) {
+      console.error("Cannot save query - missing required data:", {
+        hasQuestion: Boolean(question),
+        hasQuery: Boolean(query),
+        hasDatabaseInfo: Boolean(databaseInfo)
+      });
+      return;
+    }
+    
     onSave();
+    
     toast({
       title: "Query saved",
       description: "The query has been saved as an example",
@@ -99,6 +109,7 @@ const QueryDisplay = ({
           variant="outline"
           className="items-center justify-center gap-2"
           title="Save as example query"
+          type="button"
         >
           <Save size={16} />
           Save Query
