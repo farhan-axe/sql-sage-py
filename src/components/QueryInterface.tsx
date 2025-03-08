@@ -158,7 +158,9 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate, onSaveQ
   const handleSaveQuery = () => {
     if (!question || !generatedQuery || !onSaveQuery) return;
     
-    onSaveQuery(question, generatedQuery);
+    const formattedQuery = formatQueryWithDatabasePrefix(generatedQuery);
+    
+    onSaveQuery(question, formattedQuery);
     
     if (databaseInfo) {
       try {
@@ -172,7 +174,7 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate, onSaveQ
         
         savedQueries.push({
           question,
-          query: generatedQuery,
+          query: formattedQuery,
           timestamp: new Date().toISOString()
         });
         

@@ -54,6 +54,7 @@ const Index = () => {
     if (!examples || !dbName) return examples;
     
     // This regex looks for table references without a database prefix
+    // It matches FROM or JOIN followed by any table name that doesn't have a database.schema prefix
     const tableRegex = /\b(FROM|JOIN)\s+(?!\[?[\w]+\]?\.\[?[\w]+\]?\.\[?)([\w\[\]]+)/gi;
     
     // Replace with the full [DATABASE].[dbo].[TABLE] format
@@ -109,11 +110,15 @@ const Index = () => {
     
     // Ensure the query uses the proper database.dbo.table format
     const dbName = databaseInfo.connectionConfig.database;
-    const formattedQuery = query.replace(/\b(FROM|JOIN)\s+(?!\[?[\w]+\]?\.\[?[\w]+\]?\.\[?)([\w\[\]]+)/gi, 
-      (match, clause, tableName) => {
-        const cleanTableName = tableName.replace(/\[|\]/g, '');
-        return `${clause} [${dbName}].[dbo].[${cleanTableName}]`;
-      });
+    
+    // This regex identifies table references without the database.dbo prefix
+    const tableRegex = /\b(FROM|JOIN)\s+(?!\[?[\w]+\]?\.\[?[\w]+\]?\.\[?)([\w\[\]]+)/gi;
+    
+    // Replace with properly formatted references
+    const formattedQuery = query.replace(tableRegex, (match, clause, tableName) => {
+      const cleanTableName = tableName.replace(/\[|\]/g, '');
+      return `${clause} [${dbName}].[dbo].[${cleanTableName}]`;
+    });
     
     const newExample = `\n\n${databaseInfo.queryExamples.length > 0 ? '' : 'Below are some examples of questions:\n\n'}${databaseInfo.queryExamples.includes('1.') ? (
       `${databaseInfo.queryExamples.split('\n\n').filter(e => e.trim()).length + 1}. ${question}?,\nYour SQL Query will be like "${formattedQuery}"\n`

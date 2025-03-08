@@ -1,4 +1,3 @@
-
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -247,7 +246,7 @@ async def generate_query(request: QueryGenerationRequest):
         # Define the output rules in a separate variable, with stronger emphasis on proper table referencing
         output_rules = """
 ### Output Rules:
-1. **ALWAYS format table references as [DATABASE_NAME].[dbo].[TABLE_NAME]**
+1. **CRITICAL: ALL table references MUST use the format [DATABASE_NAME].[dbo].[TABLE_NAME]**
 2. **STRICTLY follow the example format: "Your SQL Query will be like \"SQL QUERY HERE\""**
 3. **Do NOT include ```sql ``` markup or triple backticks.**
 4. **If the question asks for total expenses, use `SUM(amount) AS total_expense`.**
@@ -263,11 +262,12 @@ async def generate_query(request: QueryGenerationRequest):
 14. **If the question asks for Customer Wise, Product Wise or Category Wise Count, for aggregated function then always use GROUP BY CLAUSE.**
 15. **Do not include ORDER BY clauses in subqueries, common table expressions, derived tables, inline functions, or views unless accompanied by TOP, OFFSET, or FOR XML, to avoid SQL Server errors.**
 16. **Always use SQL Server syntax: use TOP instead of LIMIT for row limitations.**
-17. **You MUST respond in the exact format: 'Your SQL Query will be like \"SELECT ... FROM ...\"'**
+17. **You MUST respond in the exact format: 'Your SQL Query will be like \"SELECT ... FROM [DATABASE_NAME].[dbo].[TABLE_NAME]\"'**
 18. **DO NOT explain your SQL query, just provide the query in the format specified.**
 19. **If the question asks for products and sales territory data, ensure you join the tables correctly: DimProduct connects to FactInternetSales via ProductKey, and DimSalesTerritory connects to FactInternetSales via SalesTerritoryKey.**
 20. **CRITICAL: ALL table references MUST follow the pattern [DATABASE_NAME].[dbo].[TABLE_NAME], where DATABASE_NAME is the current database name.**
 21. **Never omit the database name and schema in table references - always use the full three-part naming convention.**
+22. **Always use square brackets around database name, schema and table names to handle special characters and spaces correctly: [DATABASE_NAME].[dbo].[TABLE_NAME]**
 
 """
 
@@ -279,16 +279,16 @@ Here is the existing database table:
 {formatted_schema}
 
 # Use the user-provided query examples if available, otherwise use the defaults
-{query_examples if query_examples else """
+{query_examples if query_examples else f"""
 Below are some general examples of questions:
 
 1. Calculate me the total number of customers?,
-Your SQL Query will be like "SELECT COUNT(DISTINCT CustomerKey) FROM [DATABASE_NAME].[dbo].[DimCustomer];"
+Your SQL Query will be like "SELECT COUNT(DISTINCT CustomerKey) FROM [{database_name}].[dbo].[DimCustomer];"
 
 2. Calculate me the total number of customers who have purchased more than 5 products?,
 Your SQL Query will be like "WITH InternetSalesCTE AS (
     SELECT CustomerKey, ProductKey
-    FROM [DATABASE_NAME].[dbo].[FactInternetSales]
+    FROM [{database_name}].[dbo].[FactInternetSales]
 )
 SELECT SUM(TotalProductsPurchased) FROM (
     SELECT CustomerKey, COUNT(DISTINCT ProductKey) AS TotalProductsPurchased
@@ -300,7 +300,7 @@ SELECT SUM(TotalProductsPurchased) FROM (
 3. Provide me the list of customers who have purchased more than 5 products?,
 Your SQL Query will be like "WITH InternetSalesCTE AS (
     SELECT CustomerKey, ProductKey
-    FROM [DATABASE_NAME].[dbo].[FactInternetSales]
+    FROM [{database_name}].[dbo].[FactInternetSales]
 ),
 CustomerPurchases AS (
     SELECT CustomerKey, COUNT(DISTINCT ProductKey) AS TotalProductsPurchased
@@ -309,19 +309,19 @@ CustomerPurchases AS (
     HAVING COUNT(DISTINCT ProductKey) > 5
 )
 SELECT d.CustomerKey, d.FirstName, d.LastName, cp.TotalProductsPurchased
-FROM [DATABASE_NAME].[dbo].[DimCustomer] d
+FROM [{database_name}].[dbo].[DimCustomer] d
 JOIN CustomerPurchases cp ON d.CustomerKey = cp.CustomerKey;"
 
 4. Provide me the top 3 customers with their products and sales?,
 Your SQL Query will be like "WITH TopCustomers AS (
     SELECT TOP 3 CustomerKey, SUM(SalesAmount) AS TotalSales
-    FROM [DATABASE_NAME].[dbo].[FactInternetSales]
+    FROM [{database_name}].[dbo].[FactInternetSales]
     GROUP BY CustomerKey
     ORDER BY TotalSales DESC
 ),
 CustomerProductSales AS (
     SELECT CustomerKey, ProductKey, SUM(SalesAmount) AS ProductSales
-    FROM [DATABASE_NAME].[dbo].[FactInternetSales]
+    FROM [{database_name}].[dbo].[FactInternetSales]
     GROUP BY CustomerKey, ProductKey
 )
 SELECT 
@@ -331,9 +331,9 @@ SELECT
     dp.EnglishProductName AS Product,
     cps.ProductSales
 FROM TopCustomers tc
-JOIN [DATABASE_NAME].[dbo].[DimCustomer] dc ON tc.CustomerKey = dc.CustomerKey
+JOIN [{database_name}].[dbo].[DimCustomer] dc ON tc.CustomerKey = dc.CustomerKey
 JOIN CustomerProductSales cps ON tc.CustomerKey = cps.CustomerKey
-JOIN [DATABASE_NAME].[dbo].[DimProduct] dp ON cps.ProductKey = dp.ProductKey
+JOIN [{database_name}].[dbo].[DimProduct] dp ON cps.ProductKey = dp.ProductKey
 ORDER BY tc.TotalSales DESC, cps.ProductSales DESC;"
 
 5. provide me list of products, sales territory country name and their sales amount?,
@@ -341,9 +341,9 @@ Your SQL Query will be like "SELECT TOP 200
     p.EnglishProductName AS ProductName,
     st.SalesTerritoryCountry AS Country,
     SUM(f.SalesAmount) AS TotalSales
-FROM [DATABASE_NAME].[dbo].[DimProduct] p
-JOIN [DATABASE_NAME].[dbo].[FactInternetSales] f ON p.ProductKey = f.ProductKey
-JOIN [DATABASE_NAME].[dbo].[DimSalesTerritory] st ON st.SalesTerritoryKey = f.SalesTerritoryKey
+FROM [{database_name}].[dbo].[DimProduct] p
+JOIN [{database_name}].[dbo].[FactInternetSales] f ON p.ProductKey = f.ProductKey
+JOIN [{database_name}].[dbo].[DimSalesTerritory] st ON st.SalesTerritoryKey = f.SalesTerritoryKey
 GROUP BY p.EnglishProductName, st.SalesTerritoryCountry;"
 """}
 
@@ -387,6 +387,7 @@ User Question: {request.question} by looking at existing database table
                 table = match.group(2).strip('[]')  # Table name without brackets
                 return f"{clause} [{database_name}].[dbo].[{table}]"
                 
+            # Apply the regex substitution, with case insensitivity
             query = re.sub(table_regex, replace_table_ref, query, flags=re.IGNORECASE)
 
         logger.info(f"✅ Generated SQL Query: {query}")

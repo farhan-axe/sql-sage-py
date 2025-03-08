@@ -1,10 +1,10 @@
-
 /**
  * Generates example SQL queries based on the database schema
  * @param tables Array of table information objects
+ * @param dbName Database name
  * @returns String containing example SQL queries
  */
-function generateQueryExamples(tables: any[]): string {
+function generateQueryExamples(tables: any[], dbName: string = ""): string {
   if (!tables || tables.length === 0) {
     return 'No tables available to generate examples. Please make sure the database contains tables and you have permission to access them.';
   }
@@ -21,9 +21,9 @@ function generateQueryExamples(tables: any[]): string {
     // First generate count examples for EACH table
     tables.forEach((table, index) => {
       if (table.name) {
-        // Add count example for each table
+        // Add count example for each table with database.dbo prefix
         examples += `${index + 1}. Calculate me the total number of records in ${table.name}?,\n`;
-        examples += `Your SQL Query will be like "SELECT COUNT(*) AS TotalRecords FROM ${table.name};"\n\n`;
+        examples += `Your SQL Query will be like "SELECT COUNT(*) AS TotalRecords FROM [${dbName}].[dbo].[${table.name}];"\n\n`;
       }
     });
     
@@ -31,12 +31,12 @@ function generateQueryExamples(tables: any[]): string {
     const startIndex = tables.length + 1;
     
     examples += `${startIndex}. Calculate me the total number of customers?,\n`;
-    examples += `Your SQL Query will be like "SELECT COUNT(DISTINCT CustomerKey) FROM DimCustomer;"\n\n`;
+    examples += `Your SQL Query will be like "SELECT COUNT(DISTINCT CustomerKey) FROM [${dbName}].[dbo].[DimCustomer];"\n\n`;
     
     examples += `${startIndex + 1}. Calculate me the total number of customers who have purchased more than 5 products?,\n`;
     examples += `Your SQL Query will be like "WITH InternetSalesCTE AS (
     SELECT CustomerKey, ProductKey
-    FROM FactInternetSales
+    FROM [${dbName}].[dbo].[FactInternetSales]
 )
 SELECT SUM(TotalProductsPurchased) FROM (
     SELECT CustomerKey, COUNT(DISTINCT ProductKey) AS TotalProductsPurchased
@@ -48,7 +48,7 @@ SELECT SUM(TotalProductsPurchased) FROM (
     examples += `${startIndex + 2}. Provide me the list of customers who have purchased more than 5 products?,\n`;
     examples += `Your SQL Query will be like "WITH InternetSalesCTE AS (
     SELECT CustomerKey, ProductKey
-    FROM FactInternetSales
+    FROM [${dbName}].[dbo].[FactInternetSales]
 ),
 CustomerPurchases AS (
     SELECT CustomerKey, COUNT(DISTINCT ProductKey) AS TotalProductsPurchased
@@ -57,19 +57,19 @@ CustomerPurchases AS (
     HAVING COUNT(DISTINCT ProductKey) > 5
 )
 SELECT d.CustomerKey, d.FirstName, d.LastName, cp.TotalProductsPurchased
-FROM DimCustomer d
+FROM [${dbName}].[dbo].[DimCustomer] d
 JOIN CustomerPurchases cp ON d.CustomerKey = cp.CustomerKey;"\n\n`;
     
     examples += `${startIndex + 3}. Provide me the top 3 customers with their products and sales?,\n`;
     examples += `Your SQL Query will be like "WITH TopCustomers AS (
     SELECT TOP 3 CustomerKey, SUM(SalesAmount) AS TotalSales
-    FROM FactInternetSales
+    FROM [${dbName}].[dbo].[FactInternetSales]
     GROUP BY CustomerKey
     ORDER BY TotalSales DESC
 ),
 CustomerProductSales AS (
     SELECT CustomerKey, ProductKey, SUM(SalesAmount) AS ProductSales
-    FROM FactInternetSales
+    FROM [${dbName}].[dbo].[FactInternetSales]
     GROUP BY CustomerKey, ProductKey
 )
 SELECT 
@@ -79,9 +79,9 @@ SELECT
     dp.EnglishProductName AS Product,
     cps.ProductSales
 FROM TopCustomers tc
-JOIN DimCustomer dc ON tc.CustomerKey = dc.CustomerKey
+JOIN [${dbName}].[dbo].[DimCustomer] dc ON tc.CustomerKey = dc.CustomerKey
 JOIN CustomerProductSales cps ON tc.CustomerKey = cps.CustomerKey
-JOIN DimProduct dp ON cps.ProductKey = dp.ProductKey
+JOIN [${dbName}].[dbo].[DimProduct] dp ON cps.ProductKey = dp.ProductKey
 ORDER BY tc.TotalSales DESC, cps.ProductSales DESC;"\n\n`;
     
     return examples;
@@ -101,9 +101,9 @@ ORDER BY tc.TotalSales DESC, cps.ProductSales DESC;"\n\n`;
   // First, generate count examples for each table using the specific format
   sortedTables.forEach((table, index) => {
     if (table.name) {
-      // Add count example for each table
+      // Add count example for each table with database.dbo prefix
       examples += `${index + 1}. Calculate me the total number of records in ${table.name}?,\n`;
-      examples += `Your SQL Query will be like "SELECT COUNT(*) AS TotalRecords FROM ${table.name};"\n\n`;
+      examples += `Your SQL Query will be like "SELECT COUNT(*) AS TotalRecords FROM [${dbName}].[dbo].[${table.name}];"\n\n`;
     }
   });
   
@@ -117,7 +117,7 @@ ORDER BY tc.TotalSales DESC, cps.ProductSales DESC;"\n\n`;
   if (exampleTables.length >= 1) {
     const table = exampleTables[0];
     examples += `${exampleIndex}. Show me the top 10 records from ${table.name}?,\n`;
-    examples += `Your SQL Query will be like "SELECT TOP 10 * FROM ${table.name};"\n\n`;
+    examples += `Your SQL Query will be like "SELECT TOP 10 * FROM [${dbName}].[dbo].[${table.name}];"\n\n`;
     exampleIndex++;
   }
   
@@ -150,7 +150,7 @@ ORDER BY tc.TotalSales DESC, cps.ProductSales DESC;"\n\n`;
     }
     
     examples += `${exampleIndex}. Join ${table1.name} with ${table2.name}?,\n`;
-    examples += `Your SQL Query will be like "SELECT t1.*, t2.*\nFROM ${table1.name} t1\nJOIN ${table2.name} t2 ON t1.${joinColumn1} = t2.${joinColumn2};"\n\n`;
+    examples += `Your SQL Query will be like "SELECT t1.*, t2.*\nFROM [${dbName}].[dbo].[${table1.name}] t1\nJOIN [${dbName}].[dbo].[${table2.name}] t2 ON t1.${joinColumn1} = t2.${joinColumn2};"\n\n`;
     exampleIndex++;
   }
   
@@ -180,7 +180,7 @@ ORDER BY tc.TotalSales DESC, cps.ProductSales DESC;"\n\n`;
     
     if (groupByColumn) {
       examples += `${exampleIndex}. Count records in ${table.name} grouped by ${groupByColumn}?,\n`;
-      examples += `Your SQL Query will be like "SELECT ${groupByColumn}, COUNT(*) AS Count\nFROM ${table.name}\nGROUP BY ${groupByColumn}\nORDER BY Count DESC;"\n\n`;
+      examples += `Your SQL Query will be like "SELECT ${groupByColumn}, COUNT(*) AS Count\nFROM [${dbName}].[dbo].[${table.name}]\nGROUP BY ${groupByColumn}\nORDER BY Count DESC;"\n\n`;
       exampleIndex++;
     }
   }
@@ -213,7 +213,7 @@ ORDER BY tc.TotalSales DESC, cps.ProductSales DESC;"\n\n`;
     
     if (filterColumn) {
       examples += `${exampleIndex}. Get all records from ${table.name} where ${filterColumn} is greater than a specific value?,\n`;
-      examples += `Your SQL Query will be like "SELECT * FROM ${table.name} WHERE ${filterColumn} > [value];"\n\n`;
+      examples += `Your SQL Query will be like "SELECT * FROM [${dbName}].[dbo].[${table.name}] WHERE ${filterColumn} > [value];"\n\n`;
     }
   }
   
@@ -454,13 +454,13 @@ export const parseDatabase = async (
             });
           }
           
-          promptTemplate += `FROM ${table.name};\n\n`;
+          promptTemplate += `FROM [${database}].[dbo].[${table.name}];\n\n`;
           promptTemplate += `Primary Key: ${table.primaryKey || 'None defined'}\n\n`;
         }
       });
       
-      // Generate query examples based on the tables data
-      const queryExamples = generateQueryExamples(tables);
+      // Generate query examples based on the tables data - pass database name
+      const queryExamples = generateQueryExamples(tables, database);
       console.log("Generated query examples:", queryExamples.substring(0, 200) + "...");
       
       // Return the correctly mapped data
