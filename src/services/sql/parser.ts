@@ -101,7 +101,7 @@ export const parseDatabase = async (
         const schemaPlaceholder = "Below is the database schema\n\n" + noTablesMessage;
         
         return {
-          schema: [],
+          tables: [],
           promptTemplate: schemaPlaceholder,
           queryExamples: "## Example Queries\n\nNo tables available to generate examples. Please make sure the database contains tables and you have permission to access them.",
           connectionConfig: {
@@ -109,8 +109,7 @@ export const parseDatabase = async (
             database,
             useWindowsAuth,
             ...(sqlAuth && { username: sqlAuth.username, password: sqlAuth.password })
-          },
-          tables: []
+          }
         };
       }
       
@@ -146,7 +145,7 @@ export const parseDatabase = async (
       
       // Return the correctly mapped data
       return {
-        schema: tables, // Use tables data for schema
+        tables: tables,
         promptTemplate: promptTemplate,
         queryExamples,
         connectionConfig: {
@@ -154,8 +153,7 @@ export const parseDatabase = async (
           database,
           useWindowsAuth,
           ...(sqlAuth && { username: sqlAuth.username, password: sqlAuth.password })
-        },
-        tables: tables // This matches what the interface expects
+        }
       };
     } catch (parseError) {
       console.error("JSON parse error:", parseError);
