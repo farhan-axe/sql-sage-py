@@ -1,4 +1,3 @@
-
 import os
 import sys
 import shutil
@@ -119,8 +118,8 @@ def detect_conda_environment():
         known_paths = [
             os.path.expanduser("~/anaconda3/envs/sqlbot/python.exe"),
             os.path.expanduser("~/miniconda3/envs/sqlbot/python.exe"),
-            "C:\\Users\\farha\\anaconda3\\envs\\sqlbot\\python.exe",  # Known path from user's environment
-            "C:\\ProgramData\\Anaconda3\\envs\\sqlbot\\python.exe",
+            "C:\\\\Users\\\\farha\\\\anaconda3\\\\envs\\\\sqlbot\\\\python.exe",  # Known path from user's environment
+            "C:\\\\ProgramData\\Anaconda3\\envs\\sqlbot\\python.exe",
         ]
         
         for path in known_paths:
@@ -529,58 +528,6 @@ def run_backend():
 
 if __name__ == "__main__":
     run_backend()
-"""
-
-    with open(backend_launcher, 'w') as f:
-        f.write(launcher_content)
-    
-    print(f"Created backend launcher script at {backend_launcher}")
-    
-    # If no source backend was found, create a placeholder sql.py
-    if not has_source:
-        placeholder_sql = os.path.join(backend_dir, "sql.py")
-        with open(placeholder_sql, 'w') as f:
-            f.write("""
-import uvicorn
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-import os
-import sys
-
-# Set up logging
-import logging
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-logger = logging.getLogger(__name__)
-
-# Create a FastAPI app
-app = FastAPI()
-
-# Configure CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-@app.get("/")
-async def root():
-    return {"message": "SQL Sage Backend API"}
-
-@app.get("/health")
-async def health_check():
-    return {"status": "ok"}
-
-@app.post("/api/sql/connect")
-async def connect_placeholder():
-    return {"status": "error", "message": "Placeholder backend - actual backend not found during packaging"}
-
-if __name__ == "__main__":
-    logger.info("Starting SQL Sage backend server")
-    uvicorn.run(app, host="127.0.0.1", port=5000)
-""")
-        print("Created placeholder sql.py file")
 
 if __name__ == "__main__":
     build_backend()
