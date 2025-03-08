@@ -118,6 +118,7 @@ const DatabaseConnection = ({ onConnect, isParsing, setIsParsing }: DatabaseConn
   };
 
   const parseSelectedDatabases = async () => {
+    console.log("parseSelectedDatabases called"); // Debug log
     const selectedDatabases = selectedDbs.filter(db => db.selected && !db.parsed);
     if (selectedDatabases.length === 0) {
       toast({
@@ -490,7 +491,8 @@ const DatabaseConnection = ({ onConnect, isParsing, setIsParsing }: DatabaseConn
                     onClick={parseSelectedDatabases}
                     disabled={isParsing || selectedUnparsedCount === 0}
                     size="sm"
-                    className="ml-auto"
+                    className="ml-auto bg-primary text-white hover:bg-primary/90"
+                    type="button"
                   >
                     {isParsing ? (
                       <>
