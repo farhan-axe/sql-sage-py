@@ -1,3 +1,4 @@
+
 /**
  * Generates example SQL queries based on the database schema
  * @param tables Array of table information objects
@@ -569,6 +570,7 @@ export const isNonSqlResponse = (text: string): boolean => {
   ];
   
   // Add political and general knowledge indicators
+  // Removing terms like "age", "gender" from non-database topics
   const nonDatabaseTopics = [
     "president",
     "minister",
@@ -629,13 +631,22 @@ export const isNonSqlResponse = (text: string): boolean => {
   ];
   
   // Check for common question patterns that are not database-related
+  // Modified to exclude patterns with database-relevant terms
   const generalKnowledgePatterns = [
-    /who is/i,
-    /what is/i,
-    /when did/i,
-    /where is/i,
-    /how many people/i,
-    /tell me about/i
+    /who is (?!in|from|has|with|the|less|more|highest|lowest)/i,
+    /what is (?!the count|the sum|the average|the min|the max|in|from|has|with|the|less|more|highest|lowest)/i,
+    /when did (?!the transaction|the sale|the event|the entry|the record)/i,
+    /where is (?!the location|the address|the store|the customer|the product)/i,
+    /how many people (?!purchased|ordered|returned|visited|registered)/i,
+    /tell me about (?!the data|the table|the schema|the query|the result|the database)/i
+  ];
+  
+  // Add common database-related terms for age/gender analysis
+  const demographicDataTerms = [
+    "age", "gender", "sex", "male", "female", 
+    "demographic", "man", "woman", "men", "women",
+    "boy", "girl", "boys", "girls", "birth", "dob",
+    "date of birth", "year old", "years old"
   ];
   
   // Check for profanity
@@ -658,11 +669,17 @@ export const isNonSqlResponse = (text: string): boolean => {
     pattern.test(normalizedText)
   );
   
+  // Check if the question might be related to demographic data
+  const hasDemographicTerms = demographicDataTerms.some(term => 
+    normalizedText.includes(term.toLowerCase())
+  );
+  
   // Check if the question might be related to actual data
   const databaseRelatedTerms = [
     "table", "database", "sql", "query", "select", "row", "column", 
     "join", "data", "record", "count", "sum", "avg", "where", "from", 
-    "group by", "order by", "having"
+    "group by", "order by", "having", "show me", "less than", "more than",
+    "greater than", "filter", "sort", "list", "display", "find"
   ];
   
   // If there are database-related terms, then it might still be a valid question
@@ -670,8 +687,8 @@ export const isNonSqlResponse = (text: string): boolean => {
     normalizedText.includes(term.toLowerCase())
   );
   
-  // If the question contains database terms, don't block it even if it might match other patterns
-  if (hasDatabaseTerms) {
+  // If the question contains database terms or demographic terms, don't block it
+  if (hasDatabaseTerms || hasDemographicTerms) {
     return false;
   }
   
