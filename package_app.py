@@ -77,24 +77,56 @@ def restore_package_json():
         shutil.copy("package.json.bak", "package.json")
         os.remove("package.json.bak")
 
-def build_electron_app(backend_exe_path):
+def copy_backend_files():
+    """Copies the backend files to the backend directory used by Electron."""
+    print("Copying backend files...")
+    
+    # Get the source backend directory
+    # Check if we're in the sql-sage-py directory
+    current_dir = os.getcwd()
+    project_dir = current_dir
+    
+    # First, try to find the backend directory in the current location
+    source_backend_dir = os.path.join(project_dir, "backend")
+    if not os.path.exists(source_backend_dir):
+        # If not found, check if we need to go up one directory level
+        project_dir = os.path.dirname(current_dir)
+        source_backend_dir = os.path.join(project_dir, "backend")
+        if not os.path.exists(source_backend_dir):
+            raise FileNotFoundError(f"Backend directory not found. Expected at {source_backend_dir}")
+    
+    # Create the destination backend directory for Electron
+    dest_backend_dir = os.path.join(current_dir, "backend")
+    if not os.path.exists(dest_backend_dir):
+        os.makedirs(dest_backend_dir)
+    
+    # Copy all files from source backend to destination
+    for item in os.listdir(source_backend_dir):
+        source_item = os.path.join(source_backend_dir, item)
+        dest_item = os.path.join(dest_backend_dir, item)
+        
+        if os.path.isfile(source_item):
+            shutil.copy2(source_item, dest_item)
+            # Make executable if it's a .py file and on non-Windows
+            if item.endswith('.py') and platform.system() != "Windows":
+                os.chmod(dest_item, 0o755)
+        elif os.path.isdir(source_item):
+            if os.path.exists(dest_item):
+                shutil.rmtree(dest_item)
+            shutil.copytree(source_item, dest_item)
+    
+    # Copy env file if exists
+    if os.path.exists(".env"):
+        shutil.copy(".env", os.path.join(dest_backend_dir, ".env"))
+    
+    print(f"Backend files copied to {dest_backend_dir}")
+    return dest_backend_dir
+
+def build_electron_app():
     print("Building Electron app...")
     
-    # Copy backend executable to the backend directory
-    backend_dir = os.path.join(os.getcwd(), "backend")
-    
-    # Determine the executable name based on the platform
-    executable_name = "sql-sage-backend.exe" if platform.system() == "Windows" else "sql-sage-backend"
-    dest_path = os.path.join(backend_dir, executable_name)
-    
-    # Copy the executable and make it executable if needed
-    shutil.copy(backend_exe_path, dest_path)
-    if platform.system() != "Windows":
-        os.chmod(dest_path, 0o755)  # Make executable on Unix-like systems
-    
-    # Copy .env file to backend directory
-    if os.path.exists(".env"):
-        shutil.copy(".env", os.path.join(backend_dir, ".env"))
+    # Prepare the backend directory with all files
+    backend_dir = copy_backend_files()
     
     npm_cmd = find_npm()
     
@@ -151,9 +183,8 @@ def package_application():
     if not os.path.exists("final_package"):
         os.makedirs("final_package")
     
-    # Build the backend executable
-    from build_backend import build_backend
-    backend_exe_path = build_backend()
+    # Skip backend build as we're using the existing backend directory
+    print("Using existing backend from the backend directory...")
     
     # Build the frontend
     try:
@@ -167,7 +198,7 @@ def package_application():
     
     try:
         # Build Electron app
-        electron_app_path = build_electron_app(backend_exe_path)
+        electron_app_path = build_electron_app()
         
         # Create Ollama instructions
         instructions_path = create_ollama_instructions()
