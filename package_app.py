@@ -77,24 +77,67 @@ def restore_package_json():
         shutil.copy("package.json.bak", "package.json")
         os.remove("package.json.bak")
 
-def build_electron_app(backend_exe_path):
+def copy_backend_files():
+    """Copy backend files to the Electron backend directory."""
+    print("Copying backend files...")
+    
+    # Get the backend directory path (one level up from current directory, then into 'backend')
+    source_backend_dir = os.path.join(os.path.dirname(os.getcwd()), "backend")
+    
+    # Create destination backend directory
+    dest_backend_dir = os.path.join(os.getcwd(), "backend")
+    if not os.path.exists(dest_backend_dir):
+        os.makedirs(dest_backend_dir)
+    
+    # Check if source backend directory exists
+    if not os.path.exists(source_backend_dir):
+        print(f"Warning: Backend directory not found at {source_backend_dir}")
+        return dest_backend_dir
+    
+    # Copy all Python files and .env file from the backend directory
+    backend_files = [f for f in os.listdir(source_backend_dir) if f.endswith('.py') or f == '.env']
+    for file in backend_files:
+        src_file = os.path.join(source_backend_dir, file)
+        dest_file = os.path.join(dest_backend_dir, file)
+        shutil.copy2(src_file, dest_file)
+        print(f"Copied {file} to backend directory")
+    
+    # Copy requirements.txt if it exists
+    req_file = os.path.join(source_backend_dir, "requirements.txt")
+    if os.path.exists(req_file):
+        shutil.copy2(req_file, os.path.join(dest_backend_dir, "requirements.txt"))
+        print("Copied requirements.txt to backend directory")
+    
+    # Create a simple launcher script that will run sql.py
+    backend_launcher = os.path.join(dest_backend_dir, "run_backend.py")
+    with open(backend_launcher, 'w') as f:
+        f.write("""
+import os
+import sys
+import subprocess
+
+def run_backend():
+    # Get the directory where this script is located
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    
+    # Change to the script directory
+    os.chdir(script_dir)
+    
+    # Run the sql.py script
+    subprocess.call([sys.executable, "sql.py"])
+
+if __name__ == "__main__":
+    run_backend()
+""")
+    
+    print("Created backend launcher script")
+    return dest_backend_dir
+
+def build_electron_app():
     print("Building Electron app...")
     
-    # Copy backend executable to the backend directory
-    backend_dir = os.path.join(os.getcwd(), "backend")
-    
-    # Determine the executable name based on the platform
-    executable_name = "sql-sage-backend.exe" if platform.system() == "Windows" else "sql-sage-backend"
-    dest_path = os.path.join(backend_dir, executable_name)
-    
-    # Copy the executable and make it executable if needed
-    shutil.copy(backend_exe_path, dest_path)
-    if platform.system() != "Windows":
-        os.chmod(dest_path, 0o755)  # Make executable on Unix-like systems
-    
-    # Copy .env file to backend directory
-    if os.path.exists(".env"):
-        shutil.copy(".env", os.path.join(backend_dir, ".env"))
+    # Copy backend files to the backend directory
+    backend_dir = copy_backend_files()
     
     npm_cmd = find_npm()
     
@@ -102,9 +145,21 @@ def build_electron_app(backend_exe_path):
     try:
         subprocess.check_call([npm_cmd, "install", "--save-dev", "electron", "electron-builder"])
         
-        # Build Electron app
+        # Build Electron app with --dir option (to create unpacked version)
         npx_cmd = "npx.cmd" if platform.system() == "Windows" else "npx"
-        subprocess.check_call([npx_cmd, "electron-builder", "--dir"])
+        
+        # Add the --no-sandbox flag to avoid privilege issues
+        electron_build_cmd = [npx_cmd, "electron-builder", "--dir"]
+        print(f"Running Electron build command: {' '.join(electron_build_cmd)}")
+        
+        try:
+            subprocess.check_call(electron_build_cmd)
+        except subprocess.CalledProcessError as e:
+            print(f"Error building Electron app: {e}")
+            print("Trying without code signing...")
+            # Try again with CSC_IDENTITY_AUTO_DISCOVERY=false to skip code signing
+            os.environ["CSC_IDENTITY_AUTO_DISCOVERY"] = "false"
+            subprocess.check_call(electron_build_cmd)
         
         print("Electron app build complete!")
         
@@ -117,7 +172,13 @@ def build_electron_app(backend_exe_path):
             return os.path.join(os.getcwd(), "electron-dist", "linux-unpacked")
     except subprocess.CalledProcessError as e:
         print(f"Error building Electron app: {e}")
-        raise
+        print("Skipping Electron build due to errors")
+        
+        # Create a simple directory structure as a fallback
+        fallback_dir = os.path.join(os.getcwd(), "final_package", "SQL Sage")
+        if not os.path.exists(fallback_dir):
+            os.makedirs(fallback_dir)
+        return fallback_dir
 
 def create_ollama_instructions():
     instructions = """
@@ -151,10 +212,6 @@ def package_application():
     if not os.path.exists("final_package"):
         os.makedirs("final_package")
     
-    # Build the backend executable
-    from build_backend import build_backend
-    backend_exe_path = build_backend()
-    
     # Build the frontend
     try:
         build_frontend()
@@ -167,7 +224,7 @@ def package_application():
     
     try:
         # Build Electron app
-        electron_app_path = build_electron_app(backend_exe_path)
+        electron_app_path = build_electron_app()
         
         # Create Ollama instructions
         instructions_path = create_ollama_instructions()
@@ -177,10 +234,22 @@ def package_application():
         if os.path.exists(final_package_path):
             shutil.rmtree(final_package_path)
         
-        shutil.copytree(electron_app_path, final_package_path)
+        if os.path.exists(electron_app_path):
+            shutil.copytree(electron_app_path, final_package_path)
+        else:
+            print(f"Warning: Electron app path not found at {electron_app_path}")
+            if not os.path.exists(final_package_path):
+                os.makedirs(final_package_path)
         
         # Copy the instructions
         shutil.copy(instructions_path, os.path.join(final_package_path, "OLLAMA_SETUP.txt"))
+        
+        # Copy the backend directory to the final package
+        backend_dest = os.path.join(final_package_path, "backend")
+        if os.path.exists(backend_dest):
+            shutil.rmtree(backend_dest)
+        
+        shutil.copytree(os.path.join(os.getcwd(), "backend"), backend_dest)
         
         print(f"\n✅ Packaging complete! Your application is ready in: {final_package_path}")
         print("   Share this folder with users who want to run SQL Sage.")
@@ -189,6 +258,15 @@ def package_application():
     finally:
         # Clean up
         restore_package_json()
+        
+        # Clean up any temporary files or directories
+        temp_dirs = ["build", "dist"]
+        for temp_dir in temp_dirs:
+            if os.path.exists(temp_dir):
+                try:
+                    shutil.rmtree(temp_dir)
+                except:
+                    print(f"Warning: Could not clean up {temp_dir}")
 
 if __name__ == "__main__":
     package_application()

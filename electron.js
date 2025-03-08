@@ -6,7 +6,6 @@ const fs = require('fs');
 
 let mainWindow;
 let backendProcess;
-let backendExecutablePath;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -44,29 +43,37 @@ function createWindow() {
 
 function startBackend() {
   if (app.isPackaged) {
-    // In production, use the packaged backend executable
-    const platformSpecificPath = process.platform === 'win32' 
-      ? 'sql-sage-backend.exe' 
-      : 'sql-sage-backend';
+    // Get the path to the Python interpreter
+    let pythonPath = 'python';  // Default to system Python
     
-    backendExecutablePath = path.join(
+    // In production, use the launcher script
+    const backendDir = path.join(
       process.platform === 'darwin' 
         ? path.dirname(app.getAppPath()) 
         : app.getAppPath(),
-      '../backend',
-      platformSpecificPath
+      '../backend'
     );
     
-    if (!fs.existsSync(backendExecutablePath)) {
-      console.error(`Backend executable not found at ${backendExecutablePath}`);
-      return;
-    }
+    // Determine which file to run
+    const launcherPath = path.join(backendDir, 'run_backend.py');
+    const sqlPath = path.join(backendDir, 'sql.py');
     
-    console.log(`Starting backend from: ${backendExecutablePath}`);
-    backendProcess = spawn(backendExecutablePath);
+    const scriptToRun = fs.existsSync(launcherPath) ? launcherPath : sqlPath;
+    
+    console.log(`Starting backend from: ${scriptToRun}`);
+    backendProcess = spawn(pythonPath, [scriptToRun], {
+      cwd: backendDir  // Set working directory to backend folder
+    });
   } else {
     // In development, start the Python backend
-    backendProcess = spawn('python', ['main.py']);
+    // Locate the backend one directory up, then in 'backend' folder
+    const backendDir = path.join(path.dirname(app.getAppPath()), 'backend');
+    const sqlPath = path.join(backendDir, 'sql.py');
+    
+    console.log(`Starting backend from: ${sqlPath}`);
+    backendProcess = spawn('python', [sqlPath], {
+      cwd: backendDir  // Set working directory to backend folder
+    });
   }
 
   backendProcess.stdout.on('data', (data) => {
