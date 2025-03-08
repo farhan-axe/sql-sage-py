@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import DatabaseConnection from "@/components/DatabaseConnection";
 import QueryInterface from "@/components/QueryInterface";
@@ -45,19 +44,14 @@ const Index = () => {
     setIsConnected(true);
     setDatabaseInfo(info);
     
-    // Load saved queries from localStorage after connection
     loadSavedQueries(info);
   };
   
-  // Function to format query examples with proper database.dbo.table references
   const formatQueryExamples = (examples: string, dbName: string): string => {
     if (!examples || !dbName) return examples;
     
-    // This regex looks for table references without a database prefix
-    // It matches FROM or JOIN followed by any table name that doesn't have a database.schema prefix
     const tableRegex = /\b(FROM|JOIN)\s+(?!\[?[\w]+\]?\.\[?[\w]+\]?\.\[?)([\w\[\]]+)/gi;
     
-    // Replace with the full [DATABASE].[dbo].[TABLE] format
     return examples.replace(tableRegex, (match, clause, tableName) => {
       const cleanTableName = tableName.replace(/\[|\]/g, '');
       return `${clause} [${dbName}].[dbo].[${cleanTableName}]`;
@@ -74,18 +68,15 @@ const Index = () => {
         console.log("Loaded saved queries from localStorage:", savedQueries.length);
         
         if (savedQueries.length > 0) {
-          // Format saved queries as examples and merge with existing examples
           let formattedExamples = '';
           
           if (info.queryExamples && !info.queryExamples.includes("provide me list of products, sales territory")) {
-            // Format existing examples with proper database.dbo.table references
             formattedExamples = formatQueryExamples(info.queryExamples, info.connectionConfig.database);
           }
           
           const startingExampleIndex = formattedExamples.split('\n\n').filter(e => e.trim()).length + 1;
           
           savedQueries.forEach((savedQuery: any, index: number) => {
-            // Format the saved query with proper database.dbo.table references
             const formattedQuery = formatQueryExamples(savedQuery.query, info.connectionConfig.database);
             
             const exampleNumber = startingExampleIndex + index;
@@ -93,7 +84,6 @@ const Index = () => {
             formattedExamples += exampleText;
           });
           
-          // Update the database info with the loaded examples
           setDatabaseInfo({
             ...info,
             queryExamples: formattedExamples
@@ -108,13 +98,10 @@ const Index = () => {
   const handleSaveQuery = (question: string, query: string) => {
     if (!databaseInfo) return;
     
-    // Ensure the query uses the proper database.dbo.table format
     const dbName = databaseInfo.connectionConfig.database;
     
-    // This regex identifies table references without the database.dbo prefix
     const tableRegex = /\b(FROM|JOIN)\s+(?!\[?[\w]+\]?\.\[?[\w]+\]?\.\[?)([\w\[\]]+)/gi;
     
-    // Replace with properly formatted references
     const formattedQuery = query.replace(tableRegex, (match, clause, tableName) => {
       const cleanTableName = tableName.replace(/\[|\]/g, '');
       return `${clause} [${dbName}].[dbo].[${cleanTableName}]`;
@@ -166,28 +153,37 @@ const Index = () => {
     if (databaseInfo && databaseInfo.connectionConfig && databaseInfo.connectionConfig.database) {
       const dbName = databaseInfo.connectionConfig.database;
       
-      // Check if the product sales example exists but has the wrong database name
-      if (databaseInfo.queryExamples && databaseInfo.queryExamples.includes("provide me list of products, sales territory")) {
-        // Replace the hardcoded "Ignite" database name with the current database name in the products/sales example
-        const updatedExamples = databaseInfo.queryExamples.replace(
-          /FROM \[(Ignite|AdventureWorksDW2017|[^\]]+)\]\.\[dbo\]\.\[DimProduct\]/g, 
-          `FROM [${dbName}].[dbo].[DimProduct]`
-        ).replace(
-          /JOIN \[(Ignite|AdventureWorksDW2017|[^\]]+)\]\.\[dbo\]\.\[FactInternetSales\]/g, 
-          `JOIN [${dbName}].[dbo].[FactInternetSales]`
-        ).replace(
-          /JOIN \[(Ignite|AdventureWorksDW2017|[^\]]+)\]\.\[dbo\]\.\[DimSalesTerritory\]/g, 
-          `JOIN [${dbName}].[dbo].[DimSalesTerritory]`
-        );
-        
-        // Update the database info with corrected example queries
-        setDatabaseInfo({
-          ...databaseInfo,
-          queryExamples: updatedExamples
-        });
-      } else if (databaseInfo.queryExamples && !databaseInfo.queryExamples.includes("provide me list of products, sales territory")) {
-        // If the example doesn't exist, add it with the correct database name
-        const productSalesExample = `
+      if (databaseInfo.queryExamples) {
+        const question57Regex = /57\.\s+provide me list of products,\s+sales territory country name and their sales amount\?/;
+        if (question57Regex.test(databaseInfo.queryExamples)) {
+          const updatedExamples = databaseInfo.queryExamples.replace(
+            /(57\.\s+provide me list of products,\s+sales territory country name and their sales amount\?,\s+Your SQL Query will be like ")SELECT TOP 200[\s\S]+?FROM \[\w+\]\.(\[dbo\]\.\[DimProduct\][\s\S]+?)(?=\d+\.|\s*$)/g,
+            (match, prefix, tablesSection) => {
+              const correctedTablesSection = tablesSection
+                .replace(/\[(\w+)\]\.\[dbo\]\.\[DimProduct\]/g, `[${dbName}].[dbo].[DimProduct]`)
+                .replace(/\[(\w+)\]\.\[dbo\]\.\[FactInternetSales\]/g, `[${dbName}].[dbo].[FactInternetSales]`)
+                .replace(/\[(\w+)\]\.\[dbo\]\.\[DimSalesTerritory\]/g, `[${dbName}].[dbo].[DimSalesTerritory]`);
+              
+              return `${prefix}SELECT TOP 200 
+    p.EnglishProductName AS ProductName,
+    st.SalesTerritoryCountry AS Country,
+    SUM(f.SalesAmount) AS TotalSales
+FROM [${dbName}].[dbo].[DimProduct] p
+JOIN [${dbName}].[dbo].[FactInternetSales] f ON p.ProductKey = f.ProductKey
+JOIN [${dbName}].[dbo].[DimSalesTerritory] st ON st.SalesTerritoryKey = f.SalesTerritoryKey
+GROUP BY p.EnglishProductName, st.SalesTerritoryCountry;`;
+            }
+          );
+          
+          if (updatedExamples !== databaseInfo.queryExamples) {
+            console.log("Updated question 57 with correct database name");
+            setDatabaseInfo({
+              ...databaseInfo,
+              queryExamples: updatedExamples
+            });
+          }
+        } else if (!databaseInfo.queryExamples.includes("provide me list of products, sales territory")) {
+          const productSalesExample = `
       
 ${databaseInfo.queryExamples.split('\n\n').filter(e => e.trim()).length + 1}. provide me list of products, sales territory country name and their sales amount?,
 Your SQL Query will be like "SELECT TOP 200 
@@ -199,11 +195,12 @@ JOIN [${dbName}].[dbo].[FactInternetSales] f ON p.ProductKey = f.ProductKey
 JOIN [${dbName}].[dbo].[DimSalesTerritory] st ON st.SalesTerritoryKey = f.SalesTerritoryKey
 GROUP BY p.EnglishProductName, st.SalesTerritoryCountry;"
 `;
-        
-        setDatabaseInfo({
-          ...databaseInfo,
-          queryExamples: databaseInfo.queryExamples + productSalesExample
-        });
+          
+          setDatabaseInfo({
+            ...databaseInfo,
+            queryExamples: databaseInfo.queryExamples + productSalesExample
+          });
+        }
       }
     }
   }, [databaseInfo?.connectionConfig?.database]);
