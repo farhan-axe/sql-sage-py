@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -141,25 +140,16 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate, onSaveQ
     return queryLines.join('\n').trim();
   };
 
-  // New function to format the query with database.dbo.table pattern if needed
   const formatQueryWithDatabasePrefix = (query: string): string => {
     if (!databaseInfo || !databaseInfo.connectionConfig || !databaseInfo.connectionConfig.database) {
       return query;
     }
 
-    // Extract the database name from the connection config
     const dbName = databaseInfo.connectionConfig.database;
     
-    // Regular expression to find table names in FROM and JOIN clauses
-    // This regex looks for:
-    // 1. FROM or JOIN keyword
-    // 2. Optional whitespace
-    // 3. A table name that doesn't already include a database prefix
     const tableRegex = /\b(FROM|JOIN)\s+(?!\[?[\w]+\]?\.\[?[\w]+\]?\.\[?)([\w\[\]]+)/gi;
     
-    // Replace table names with database.dbo.table format
     return query.replace(tableRegex, (match, clause, tableName) => {
-      // If the table name is already in brackets, remove them
       const cleanTableName = tableName.replace(/\[|\]/g, '');
       return `${clause} [${dbName}].[dbo].[${cleanTableName}]`;
     });
@@ -261,10 +251,8 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate, onSaveQ
       const endTime = Date.now(); // Track when we finish generating
       const timeElapsed = endTime - startTime;
       
-      // Store the generation time in component state
       setQueryGenerationTime(timeElapsed);
       
-      // Call the callback with the time it took to generate the query
       if (onQueryGenerated) {
         onQueryGenerated(timeElapsed);
       }
@@ -297,7 +285,6 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate, onSaveQ
         finalQuery = finalQuery.replace(/SELECT/i, 'SELECT TOP 200');
       }
       
-      // Apply database.dbo.table format to the query
       const formattedQuery = formatQueryWithDatabasePrefix(finalQuery);
       console.log("Formatted query with database prefix:", formattedQuery);
       

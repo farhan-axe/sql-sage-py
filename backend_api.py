@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import pyodbc
 import logging
+import re
 from typing import Optional, Dict, Any
 
 # Configure logging
@@ -227,21 +228,23 @@ async def generate_query(request: QueryGenerationRequest):
         # Replace LIMIT with TOP in any examples
         if query_examples:
             query_examples = query_examples.replace("LIMIT", "-- LIMIT (Note: Use TOP instead for SQL Server)")
-            # Add database prefix to examples if not already present
+            
+            # Ensure all table references use the format [DATABASE_NAME].[dbo].[TABLE_NAME]
             if database_name:
-                # This regex looks for table names in FROM and JOIN clauses that don't have database prefix
+                # Reformat examples to consistently use [DATABASE].[dbo].[TABLE] format
+                def replace_table_reference(match):
+                    clause = match.group(1)  # FROM or JOIN
+                    table = match.group(2).strip('[]')  # Table name without brackets
+                    return f"{clause} [{database_name}].[dbo].[{table}]"
+                
+                # This regex looks for FROM or JOIN followed by table names without database prefix
                 table_regex = r'\b(FROM|JOIN)\s+(?!\[?[\w]+\]?\.\[?[\w]+\]?\.\[?)([\w\[\]]+)'
-                query_examples = re.sub(
-                    table_regex, 
-                    lambda m: f"{m.group(1)} [{database_name}].[dbo].[{m.group(2).replace('[', '').replace(']', '')}]", 
-                    query_examples, 
-                    flags=re.IGNORECASE
-                )
+                query_examples = re.sub(table_regex, replace_table_reference, query_examples, flags=re.IGNORECASE)
 
         logger.info(f"Database Schema (from prompt_template):\n{formatted_schema}\n\n")
         logger.info(f"Query Examples:\n{query_examples}\n\n")
 
-        # Define the output rules in a separate variable.
+        # Define the output rules in a separate variable, with stronger emphasis on proper table referencing
         output_rules = """
 ### Output Rules:
 1. **ALWAYS format table references as [DATABASE_NAME].[dbo].[TABLE_NAME]**
@@ -263,7 +266,8 @@ async def generate_query(request: QueryGenerationRequest):
 17. **You MUST respond in the exact format: 'Your SQL Query will be like \"SELECT ... FROM ...\"'**
 18. **DO NOT explain your SQL query, just provide the query in the format specified.**
 19. **If the question asks for products and sales territory data, ensure you join the tables correctly: DimProduct connects to FactInternetSales via ProductKey, and DimSalesTerritory connects to FactInternetSales via SalesTerritoryKey.**
-20. **ALL table references MUST follow the pattern [DATABASE_NAME].[dbo].[TABLE_NAME], where DATABASE_NAME is the current database.**
+20. **CRITICAL: ALL table references MUST follow the pattern [DATABASE_NAME].[dbo].[TABLE_NAME], where DATABASE_NAME is the current database name.**
+21. **Never omit the database name and schema in table references - always use the full three-part naming convention.**
 
 """
 
@@ -347,7 +351,7 @@ Here are the output rules:
 {output_rules}
 
 IMPORTANT: Your output MUST follow the pattern "Your SQL Query will be like \"SQL QUERY HERE\"". Do not include triple backticks, explanations, or any other text.
-You MUST format all table references as [DATABASE_NAME].[dbo].[TABLE_NAME] where DATABASE_NAME is the current database name.
+You MUST format all table references as [DATABASE_NAME].[dbo].[TABLE_NAME] where DATABASE_NAME is the current database name which is: {database_name}
 
 User Question: {request.question} by looking at existing database table
 
@@ -371,6 +375,19 @@ User Question: {request.question} by looking at existing database table
                 status_code=400,
                 detail="No SQL query found in the model's response."
             )
+            
+        # Make sure all table references use the proper format
+        if database_name:
+            # This regex identifies table references without the database.dbo prefix
+            table_regex = r'\b(FROM|JOIN)\s+(?!\[?[\w]+\]?\.\[?[\w]+\]?\.\[?)([\w\[\]]+)'
+            
+            # Replace them with properly formatted references
+            def replace_table_ref(match):
+                clause = match.group(1)  # FROM or JOIN
+                table = match.group(2).strip('[]')  # Table name without brackets
+                return f"{clause} [{database_name}].[dbo].[{table}]"
+                
+            query = re.sub(table_regex, replace_table_ref, query, flags=re.IGNORECASE)
 
         logger.info(f"✅ Generated SQL Query: {query}")
         return {"query": query}
@@ -378,4 +395,3 @@ User Question: {request.question} by looking at existing database table
     except Exception as e:
         logger.error(f"❌ Query Generation Error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
-

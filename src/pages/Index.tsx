@@ -49,6 +49,20 @@ const Index = () => {
     loadSavedQueries(info);
   };
   
+  // Function to format query examples with proper database.dbo.table references
+  const formatQueryExamples = (examples: string, dbName: string): string => {
+    if (!examples || !dbName) return examples;
+    
+    // This regex looks for table references without a database prefix
+    const tableRegex = /\b(FROM|JOIN)\s+(?!\[?[\w]+\]?\.\[?[\w]+\]?\.\[?)([\w\[\]]+)/gi;
+    
+    // Replace with the full [DATABASE].[dbo].[TABLE] format
+    return examples.replace(tableRegex, (match, clause, tableName) => {
+      const cleanTableName = tableName.replace(/\[|\]/g, '');
+      return `${clause} [${dbName}].[dbo].[${cleanTableName}]`;
+    });
+  };
+  
   const loadSavedQueries = (info: DatabaseInfo) => {
     try {
       const savedQueriesKey = `savedQueries_${info.connectionConfig.server}_${info.connectionConfig.database}`;
@@ -63,14 +77,18 @@ const Index = () => {
           let formattedExamples = '';
           
           if (info.queryExamples && !info.queryExamples.includes("provide me list of products, sales territory")) {
-            formattedExamples = info.queryExamples;
+            // Format existing examples with proper database.dbo.table references
+            formattedExamples = formatQueryExamples(info.queryExamples, info.connectionConfig.database);
           }
           
           const startingExampleIndex = formattedExamples.split('\n\n').filter(e => e.trim()).length + 1;
           
           savedQueries.forEach((savedQuery: any, index: number) => {
+            // Format the saved query with proper database.dbo.table references
+            const formattedQuery = formatQueryExamples(savedQuery.query, info.connectionConfig.database);
+            
             const exampleNumber = startingExampleIndex + index;
-            const exampleText = `\n\n${exampleNumber}. ${savedQuery.question}?,\nYour SQL Query will be like "${savedQuery.query}"\n`;
+            const exampleText = `\n\n${exampleNumber}. ${savedQuery.question}?,\nYour SQL Query will be like "${formattedQuery}"\n`;
             formattedExamples += exampleText;
           });
           
@@ -89,10 +107,18 @@ const Index = () => {
   const handleSaveQuery = (question: string, query: string) => {
     if (!databaseInfo) return;
     
+    // Ensure the query uses the proper database.dbo.table format
+    const dbName = databaseInfo.connectionConfig.database;
+    const formattedQuery = query.replace(/\b(FROM|JOIN)\s+(?!\[?[\w]+\]?\.\[?[\w]+\]?\.\[?)([\w\[\]]+)/gi, 
+      (match, clause, tableName) => {
+        const cleanTableName = tableName.replace(/\[|\]/g, '');
+        return `${clause} [${dbName}].[dbo].[${cleanTableName}]`;
+      });
+    
     const newExample = `\n\n${databaseInfo.queryExamples.length > 0 ? '' : 'Below are some examples of questions:\n\n'}${databaseInfo.queryExamples.includes('1.') ? (
-      `${databaseInfo.queryExamples.split('\n\n').filter(e => e.trim()).length + 1}. ${question}?,\nYour SQL Query will be like "${query}"\n`
+      `${databaseInfo.queryExamples.split('\n\n').filter(e => e.trim()).length + 1}. ${question}?,\nYour SQL Query will be like "${formattedQuery}"\n`
     ) : (
-      `1. ${question}?,\nYour SQL Query will be like "${query}"\n`
+      `1. ${question}?,\nYour SQL Query will be like "${formattedQuery}"\n`
     )}`;
     
     const updatedExamples = databaseInfo.queryExamples 
@@ -133,6 +159,7 @@ const Index = () => {
 
   useEffect(() => {
     if (databaseInfo && databaseInfo.queryExamples && !databaseInfo.queryExamples.includes("provide me list of products, sales territory")) {
+      const dbName = databaseInfo.connectionConfig.database;
       const productSalesExample = `
       
 ${databaseInfo.queryExamples.split('\n\n').filter(e => e.trim()).length + 1}. provide me list of products, sales territory country name and their sales amount?,
@@ -140,9 +167,9 @@ Your SQL Query will be like "SELECT TOP 200
     p.EnglishProductName AS ProductName,
     st.SalesTerritoryCountry AS Country,
     SUM(f.SalesAmount) AS TotalSales
-FROM DimProduct p
-JOIN FactInternetSales f ON p.ProductKey = f.ProductKey
-JOIN DimSalesTerritory st ON st.SalesTerritoryKey = f.SalesTerritoryKey
+FROM [${dbName}].[dbo].[DimProduct] p
+JOIN [${dbName}].[dbo].[FactInternetSales] f ON p.ProductKey = f.ProductKey
+JOIN [${dbName}].[dbo].[DimSalesTerritory] st ON st.SalesTerritoryKey = f.SalesTerritoryKey
 GROUP BY p.EnglishProductName, st.SalesTerritoryCountry;"
 `;
       
