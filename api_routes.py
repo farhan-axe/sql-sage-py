@@ -5,6 +5,7 @@ import logging
 import os
 import sys
 import platform
+import socket
 from dotenv import load_dotenv
 import traceback
 
@@ -16,6 +17,36 @@ print(f"Current directory: {os.getcwd()}")
 print(f"PYTHONPATH: {os.environ.get('PYTHONPATH', 'Not set')}")
 print(f"PATH: {os.environ.get('PATH', 'Not set')[:200]}...") # Show first 200 chars of PATH
 print(f"Conda environment: {os.environ.get('CONDA_PREFIX', 'Not in conda')}")
+
+# ------------------------------ Load environment variables ------------------------------
+load_dotenv()
+
+# ------------------------------ Verify Ollama is running ------------------------------
+def check_ollama_running():
+    """Check if Ollama server is running by attempting to connect to its port."""
+    host = os.getenv("OLLAMA_HOST", "localhost")
+    port = int(os.getenv("OLLAMA_PORT", "11434"))
+    
+    try:
+        # Try to create a socket connection to the Ollama server
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(2)  # Set a timeout for the connection attempt
+            result = s.connect_ex((host, port))
+            is_running = result == 0  # If result is 0, the connection was successful
+            if is_running:
+                print(f"Ollama server is running at {host}:{port}")
+            else:
+                print(f"Ollama server is NOT running at {host}:{port}")
+            return is_running
+    except Exception as e:
+        print(f"Error checking Ollama server: {e}")
+        return False  # Any exception means Ollama is not accessible
+
+# Verify Ollama is running before continuing
+if not check_ollama_running():
+    print("ERROR: Ollama is not running! The application will not work correctly.")
+    print("Please start Ollama and restart the application.")
+    # We'll continue execution so the API server starts, but queries will fail
 
 # Import modules with error handling
 try:
@@ -111,9 +142,6 @@ def generate_query(request_dict):
             traceback.print_exc()
             raise
 
-# ------------------------------ Load environment variables ------------------------------
-load_dotenv()
-
 # ------------------------------ Configure Logging ------------------------------
 logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -137,13 +165,27 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    return {"status": "ok"}
+    """Health check that also returns status of Ollama connection"""
+    ollama_status = "ok" if check_ollama_running() else "error"
+    return {
+        "status": "ok", 
+        "services": {
+            "ollama": ollama_status
+        }
+    }
 
 @app.post("/api/sql/connect")
 async def connect_endpoint(config: ConnectionConfig):
     """
     Connects to the SQL Server and lists available databases.
     """
+    # Check if Ollama is running before proceeding
+    if not check_ollama_running():
+        return {
+            "status": "error", 
+            "message": "Ollama service is not running. Please start Ollama and try again."
+        }
+        
     try:
         return connect_and_list_databases(config)
     except Exception as e:
@@ -156,6 +198,13 @@ async def parse_database_endpoint(config: ConnectionConfig):
     """
     Parses the database schema and returns a structured representation.
     """
+    # Check if Ollama is running before proceeding
+    if not check_ollama_running():
+        return {
+            "status": "error", 
+            "message": "Ollama service is not running. Please start Ollama and try again."
+        }
+        
     try:
         return parse_database_schema(config)
     except Exception as e:
@@ -168,6 +217,14 @@ async def generate_query_endpoint(request: QueryGenerationRequest):
     """
     Generates an SQL query using an LLM via Ollama, returning ONLY the SQL string.
     """
+    # Check if Ollama is running before proceeding
+    if not check_ollama_running():
+        return {
+            "status": "error", 
+            "message": "Ollama service is not running. Please start Ollama and try again.",
+            "query": ""
+        }
+        
     try:
         return generate_query(request.dict())
     except Exception as e:

@@ -38,12 +38,17 @@ You can customize the model used by:
    pip install -r requirements.txt
    ```
 
-2. Start the backend:
+2. Start Ollama:
+   ```bash
+   ollama serve
+   ```
+
+3. Start the backend:
    ```bash
    python main.py
    ```
 
-3. Start the frontend in another terminal:
+4. Start the frontend in another terminal:
    ```bash
    npm run dev
    ```
@@ -51,8 +56,11 @@ You can customize the model used by:
 ### Using Executables
 
 1. Start Ollama (must be running before launching the application)
-2. Run the backend executable
-3. Run the frontend executable
+   ```bash
+   ollama serve
+   ```
+
+2. Run the SQL Sage application
 
 ## Troubleshooting
 
@@ -66,6 +74,9 @@ You can customize the model used by:
 - For model-specific errors, try using a different DeepSeek model variant:
   - deepseek-r1:8b (smaller, faster)
   - deepseek-r1:14b (larger, more accurate)
+
+- If the application shows an error about Python or the backend process, make sure Python is installed
+  and that your environment has the required packages (fastapi, uvicorn, etc.).
 
 ## Important Notes
 
