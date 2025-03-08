@@ -5,7 +5,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { DatabaseInfo, QueryRefinementAttempt, QueryErrorType, QueryInterfaceProps } from "@/types/database";
 import DataDisplay from "./DataDisplay";
 import ChartVisualization from "./ChartVisualization";
-import { RotateCcw, PlayCircle, XCircle, Clock, AlertCircle, Save, Plus, Speedometer } from "lucide-react";
+import { RotateCcw, PlayCircle, XCircle, Clock, AlertCircle, Save, Plus, Timer } from "lucide-react";
 import { terminateSession, isNonSqlResponse } from "@/services/sqlServer";
 
 const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate, onSaveQuery, onQueryGenerated }: QueryInterfaceProps) => {
@@ -527,7 +527,7 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate, onSaveQ
             <h3 className="text-sm font-medium text-gray-700">Generated SQL Query</h3>
             {queryGenerationTime !== null && (
               <div className="flex items-center gap-1 text-xs text-gray-500">
-                <Speedometer size={14} className="text-blue-500" />
+                <Timer size={14} className="text-blue-500" />
                 <span>Generated in {formatGenerationTime(queryGenerationTime)}</span>
               </div>
             )}
