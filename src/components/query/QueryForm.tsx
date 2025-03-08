@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,6 +17,7 @@ interface QueryFormProps {
   setController: (controller: AbortController | null) => void;
   sessionTimeout: NodeJS.Timeout | null;
   setSessionTimeout: (timeout: NodeJS.Timeout | null) => void;
+  setQuestion: (question: string) => void;
 }
 
 const QueryForm = ({
@@ -30,10 +30,11 @@ const QueryForm = ({
   controller,
   setController,
   sessionTimeout,
-  setSessionTimeout
+  setSessionTimeout,
+  setQuestion
 }: QueryFormProps) => {
   const { toast } = useToast();
-  const [question, setQuestion] = useState("");
+  const [questionInput, setQuestionInput] = useState("");
   const [elapsedTime, setElapsedTime] = useState(0);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef<number | null>(null);
@@ -209,7 +210,7 @@ const QueryForm = ({
   };
 
   const handleQueryGeneration = async () => {
-    if (!question.trim() || !databaseInfo) {
+    if (!questionInput.trim() || !databaseInfo) {
       toast({
         title: "Please enter a question and ensure database is connected",
         variant: "destructive",
@@ -217,10 +218,11 @@ const QueryForm = ({
       return;
     }
 
-    if (!validateQuestion(question)) {
+    if (!validateQuestion(questionInput)) {
       return;
     }
 
+    setQuestion(questionInput);
     setIsGenerating(true);
 
     const newController = new AbortController();
@@ -250,7 +252,7 @@ const QueryForm = ({
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            question,
+            question: questionInput,
             databaseInfo,
             maxRows: 200,
             promptTemplate: databaseInfo.promptTemplate,
@@ -331,15 +333,15 @@ const QueryForm = ({
       </label>
       <Textarea
         id="question"
-        value={question}
-        onChange={(e) => setQuestion(e.target.value)}
+        value={questionInput}
+        onChange={(e) => setQuestionInput(e.target.value)}
         placeholder="e.g., Show me the sales from last year"
         className="h-24"
       />
       <div className="flex gap-2">
         <Button 
           onClick={handleQueryGeneration}
-          disabled={isGenerating || !question.trim() || !isConnected}
+          disabled={isGenerating || !questionInput.trim() || !isConnected}
           className="flex-1"
           variant={isGenerating ? "secondary" : "default"}
         >

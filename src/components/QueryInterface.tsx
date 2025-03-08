@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { DatabaseInfo, QueryRefinementAttempt } from "@/types/database";
 import { useToast } from "@/components/ui/use-toast";
@@ -250,14 +249,32 @@ const QueryInterface = ({
   };
 
   const handleSaveQuery = () => {
-    if (!question || !generatedQuery || !onSaveQuery || !databaseInfo) return;
+    if (!question || !generatedQuery || !onSaveQuery || !databaseInfo) {
+      console.log("Cannot save query - missing required data:", {
+        hasQuestion: Boolean(question),
+        hasGeneratedQuery: Boolean(generatedQuery),
+        hasOnSaveQuery: Boolean(onSaveQuery),
+        hasDatabaseInfo: Boolean(databaseInfo)
+      });
+      return;
+    }
     
     const formattedQuery = formatQueryWithDatabasePrefix(
       generatedQuery, 
       databaseInfo.connectionConfig.database
     );
     
+    console.log("Saving query:", {
+      question,
+      formattedQuery
+    });
+    
     onSaveQuery(question, formattedQuery);
+    
+    toast({
+      title: "Query saved",
+      description: "The query has been saved as an example"
+    });
   };
 
   if (!isConnected || !databaseInfo) {
@@ -283,6 +300,7 @@ const QueryInterface = ({
         setController={setController}
         sessionTimeout={sessionTimeout}
         setSessionTimeout={setSessionTimeout}
+        setQuestion={setQuestion}
       />
 
       <ErrorDisplay error={queryError || ""} />

@@ -99,6 +99,35 @@ const Index = () => {
   const handleSaveQuery = (question: string, query: string) => {
     if (!databaseInfo) return;
     
+    console.log("Saving query to examples:", { question, query });
+    
+    // Save to localStorage for persistence
+    try {
+      const savedQueriesKey = `savedQueries_${databaseInfo.connectionConfig.server}_${databaseInfo.connectionConfig.database}`;
+      let savedQueries = [];
+      
+      const existingSavedQueriesString = localStorage.getItem(savedQueriesKey);
+      if (existingSavedQueriesString) {
+        savedQueries = JSON.parse(existingSavedQueriesString);
+      }
+      
+      // Check if this query already exists
+      const queryExists = savedQueries.some((q: any) => 
+        q.question === question && q.query === query
+      );
+      
+      if (!queryExists) {
+        savedQueries.push({ question, query });
+        localStorage.setItem(savedQueriesKey, JSON.stringify(savedQueries));
+        console.log(`Saved query to localStorage. Total saved queries: ${savedQueries.length}`);
+      } else {
+        console.log("Query already exists in saved queries, not saving duplicate");
+      }
+    } catch (error) {
+      console.error("Error saving query to localStorage:", error);
+    }
+    
+    // Update the examples in databaseInfo
     const dbName = databaseInfo.connectionConfig.database;
     
     const tableRegex = /\b(FROM|JOIN)\s+(?!\[?[\w]+\]?\.\[?[\w]+\]?\.\[?)([\w\[\]]+)/gi;
@@ -124,6 +153,12 @@ const Index = () => {
     });
     
     console.log("Updated query examples:", updatedExamples);
+    
+    // Show success toast
+    toast({
+      title: "Query saved successfully",
+      description: "The query has been added to your examples",
+    });
   };
 
   const handleQueryGenerated = (timeInMs: number) => {
