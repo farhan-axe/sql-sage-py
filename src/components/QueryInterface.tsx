@@ -284,7 +284,7 @@ const QueryInterface = ({ isConnected, databaseInfo, onSessionTerminate, onSaveQ
       let finalQuery = cleanedQuery;
       if (finalQuery.toUpperCase().trim().startsWith('SELECT') && 
           !finalQuery.toUpperCase().includes('TOP ')) {
-        finalQuery = finalQuery.replace(/SELECT/i, 'SELECT TOP 200');
+        finalQuery = finalQuery.replace(/SELECT\s+/i, 'SELECT TOP 200 ');
       }
       
       const formattedQuery = formatQueryWithDatabasePrefix(finalQuery);
