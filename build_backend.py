@@ -163,7 +163,7 @@ def create_backend_launcher(backend_dir, has_source=True, python_path=None):
         python_path = sys.executable
     
     with open(backend_launcher, 'w') as f:
-        f.write(f"""
+        f.write("""
 import os
 import sys
 import subprocess
@@ -171,13 +171,13 @@ import platform
 import time
 
 # Hard-coded python path from build time
-CONDA_PYTHON_PATH = {repr(python_path)}
+CONDA_PYTHON_PATH = """ + repr(python_path) + """
 
 def find_python_executable():
-    """Find the Python executable to use."""
+    \"\"\"Find the Python executable to use.\"\"\"
     # First try the hard-coded path from build time
     if os.path.exists(CONDA_PYTHON_PATH):
-        print(f"Using conda Python: {{CONDA_PYTHON_PATH}}")
+        print(f"Using conda Python: {CONDA_PYTHON_PATH}")
         return CONDA_PYTHON_PATH
     
     # Check if we're running in a conda environment
@@ -189,7 +189,7 @@ def find_python_executable():
             conda_python = os.path.join(conda_prefix, "bin", "python")
         
         if os.path.exists(conda_python):
-            print(f"Found conda Python: {{conda_python}}")
+            print(f"Found conda Python: {conda_python}")
             return conda_python
     
     # Check common locations for Python
@@ -221,7 +221,7 @@ def find_python_executable():
     
     for path in common_paths:
         if os.path.exists(path):
-            print(f"Found Python at common location: {{path}}")
+            print(f"Found Python at common location: {path}")
             return path
     
     # As a last resort, use the system's python (which may fail)
@@ -240,12 +240,12 @@ def run_backend():
     os.chdir(script_dir)
     
     # Print diagnostic information
-    print(f"Working directory: {{os.getcwd()}}")
-    print(f"System platform: {{platform.platform()}}")
+    print(f"Working directory: {os.getcwd()}")
+    print(f"System platform: {platform.platform()}")
     
     # Find the python executable
     python_exe = find_python_executable()
-    print(f"Using Python executable: {{python_exe}}")
+    print(f"Using Python executable: {python_exe}")
     
     try:
         # First, check if necessary packages are installed
@@ -256,7 +256,7 @@ def run_backend():
             print(output)
             packages_installed = True
         except subprocess.CalledProcessError as e:
-            print(f"Error checking packages: {{e.output}}")
+            print(f"Error checking packages: {e.output}")
             packages_installed = False
         
         if not packages_installed:
@@ -264,7 +264,7 @@ def run_backend():
             # Check if requirements.txt exists
             req_file = os.path.join(script_dir, "requirements.txt")
             if os.path.exists(req_file):
-                print(f"Installing packages from {{req_file}}")
+                print(f"Installing packages from {req_file}")
                 subprocess.check_call([python_exe, "-m", "pip", "install", "-r", req_file])
             else:
                 # Install minimum required packages
@@ -274,21 +274,21 @@ def run_backend():
         # Check if api_routes.py exists
         api_routes_path = os.path.join(script_dir, "api_routes.py")
         if os.path.exists(api_routes_path):
-            print(f"Starting backend using {{api_routes_path}}")
+            print(f"Starting backend using {api_routes_path}")
             subprocess.Popen([python_exe, api_routes_path])
             return
         
         # Check if sql.py exists as fallback
         sql_path = os.path.join(script_dir, "sql.py")
         if os.path.exists(sql_path):
-            print(f"Starting backend using {{sql_path}}")
+            print(f"Starting backend using {sql_path}")
             subprocess.Popen([python_exe, sql_path])
             return
         
         print("ERROR: Could not find api_routes.py or sql.py. Backend cannot start.")
         
     except Exception as e:
-        print(f"Error starting backend: {{e}}")
+        print(f"Error starting backend: {e}")
         import traceback
         traceback.print_exc()
 
