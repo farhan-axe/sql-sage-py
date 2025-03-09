@@ -80,9 +80,21 @@ SQL Sage now supports two packaging methods for the backend:
 2. **Python Script (fallback):**
    - Used if PyInstaller fails or is not installed
    - Requires the user to have Python installed
-   - Backend script runs using available Python on the user's system
+   - Backend script always tries to use the full absolute path to Python, never just 'python'
 
 The packaging script automatically tries to use PyInstaller first, falling back to the Python script method if necessary.
+
+## Python Path Handling
+
+When using the Python script method (fallback), the application:
+
+1. First checks for a custom path in `python_config.json`
+2. Then tries the hardcoded Python path
+3. Searches common installation locations
+4. Looks for Python in the system PATH, but gets its full absolute path
+5. Only as a last resort uses the command 'python'
+
+This approach minimizes the risk of "spawn python ENOENT" errors that occur when the system can't find the Python executable.
 
 ## Customization
 
@@ -100,7 +112,10 @@ To customize the packaged application:
 ## Troubleshooting
 
 - If PyInstaller packaging fails, the system will automatically fall back to the Python script method
-- For users experiencing "ENOENT" errors with the Python script method, make sure they have Python installed and it's in their PATH
+- For users experiencing "ENOENT" errors with the Python script method:
+  - Ensure Python is installed and in their PATH
+  - Create a `python_config.json` file with the absolute path to their Python executable
+  - Or use the PyInstaller version which doesn't require Python
 - The start_sql_sage.bat script includes detailed Python detection and will show which Python it found
 - For Ollama connection issues, check the setup instructions in OLLAMA_SETUP.txt
 - If the PyInstaller executable doesn't start, check for error files in the backend directory

@@ -44,34 +44,20 @@ def find_python_executable():
         print(f"Using hardcoded Python path: {hardcoded_python_path}")
         return os.path.normpath(hardcoded_python_path)
     
-    # Search for Python in PATH
-    python_names = ["python", "python3", "py"]
-    if platform.system() == "Windows":
-        python_names.extend(["py.exe", "python.exe", "python3.exe"])
-    
-    for name in python_names:
-        try:
-            result = subprocess.run([name, "--version"], 
-                                   capture_output=True, 
-                                   text=True)
-            if result.returncode == 0:
-                print(f"Found Python in PATH: {name}")
-                return name
-        except (subprocess.SubprocessError, FileNotFoundError):
-            pass
-    
-    # Check common installation paths
+    # Check common installation paths, focusing on full paths first
     common_paths = []
     if platform.system() == "Windows":
-        for version in ["38", "39", "310", "311", "312"]:
+        # Add common Windows Python installation paths
+        for version in ["311", "310", "39", "38", "312"]:
             common_paths.extend([
                 os.path.join("C:\\", "Program Files", f"Python{version}", "python.exe"),
                 os.path.join("C:\\", "Program Files (x86)", f"Python{version}", "python.exe"),
                 os.path.join(os.path.expanduser("~"), "AppData", "Local", "Programs", "Python", f"Python{version}", "python.exe")
             ])
-        # Add msys2 path
+        # Add msys2 path that was found in the user's environment
         common_paths.append(r"C:\msys64\mingw64\bin\python.exe")
     
+    # Try specific paths first - we want full absolute paths!
     for path in common_paths:
         if os.path.exists(path):
             try:
@@ -79,13 +65,34 @@ def find_python_executable():
                                        capture_output=True, 
                                        text=True)
                 if result.returncode == 0:
-                    print(f"Found Python at: {path}")
+                    print(f"Found working Python at: {path}")
                     return path
             except subprocess.SubprocessError:
                 pass
     
-    # As a last resort, just use "python"
-    print("Could not find Python path. Using 'python' command.")
+    # As a last resort, try to find Python in PATH but get its full path
+    python_names = ["python.exe", "python3.exe", "py.exe", "python", "python3", "py"]
+    
+    for name in python_names:
+        try:
+            # Try to get the full path of the Python command
+            if platform.system() == "Windows":
+                path_cmd = f"where {name}"
+            else:
+                path_cmd = f"which {name}"
+                
+            result = subprocess.run(path_cmd, shell=True, capture_output=True, text=True)
+            
+            if result.returncode == 0 and result.stdout.strip():
+                full_path = result.stdout.strip().split('\n')[0]
+                if os.path.exists(full_path):
+                    print(f"Found Python in PATH: {full_path}")
+                    return full_path
+        except (subprocess.SubprocessError, FileNotFoundError):
+            pass
+    
+    # If we get here and still can't find Python, just return "python" as a last resort
+    print("WARNING: Could not find a specific Python path. Using 'python' command.")
     return "python"
 
 def detect_conda_environment():

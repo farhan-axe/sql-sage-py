@@ -21,50 +21,41 @@ If the PyInstaller packaging fails or you're using an older version, SQL Sage fa
 
 SQL Sage is configured to try these Python paths in order:
 
-1. The system PATH (checking for `python`, `python3`, or `py`)
-2. A hardcoded path (if provided): `C:\Users\farha\anaconda3\envs\sqlbot\python.exe`
+1. A custom path defined in `python_config.json` (if you created one)
+2. The hardcoded path (if it exists): `C:\Users\farha\anaconda3\envs\sqlbot\python.exe`
 3. Common Python installation locations based on your operating system
+4. Any Python executable found in the system PATH (using its full absolute path)
 
 ### If You Need to Change the Python Path
 
 If you need to use a specific Python environment, you have these options:
 
-1. **Make sure Python is in the system PATH (recommended)**
-   - This is the easiest approach and works for most users
-   - SQL Sage will automatically find and use Python from the PATH
-
-2. **Create a python_config.json file** in the application directory with:
+1. **Create a python_config.json file** in the application directory with:
    ```json
    {
      "python_path": "C:\\path\\to\\your\\python.exe"
    }
    ```
 
-3. **Modify the hardcoded path** in these files:
+2. **Modify the hardcoded path** in these files:
    - `backend_utils/environment.py`
    - `backend_utils/build.py`
    - `backend_utils/package_app.py`
+   - `src/services/sql/utils.py`
+   - `backend_utils/launcher.py`
+
+3. **Make sure Python is in the system PATH** (with any of the common names: python, python3, py)
+   - The application will try to find the full absolute path of the Python executable in PATH
 
 ### How SQL Sage Finds Python (Script Mode Only)
 
 The application will search for Python in this order:
 
-1. System PATH (using commands like "python", "python3", "py")
+1. Custom path in `python_config.json` (if present)
 2. Hardcoded path (if it exists)
 3. Common installation directories based on your operating system
-4. As a last resort, it will try to use just "python" and hope it works
-
-## Verifying Your Python Environment (Script Mode Only)
-
-To verify your Python environment is correctly configured:
-
-1. Open a Command Prompt or PowerShell window
-2. Run: `python --version`
-3. You should see a version number printed (e.g., "Python 3.8.5")
-4. Verify required packages are installed:
-   ```
-   python -c "import fastapi, uvicorn; print('OK')"
-   ```
+4. Full absolute path of any Python executable found in system PATH
+5. As a last resort, it will try to use just "python" and hope it works
 
 ## Troubleshooting (Script Mode Only)
 
@@ -75,6 +66,13 @@ If you see "spawn python ENOENT" errors, it means the application can't find the
 1. The Python path is incorrect or doesn't exist
 2. The Python executable is not in your system PATH
 3. Python is installed but not properly configured
+
+To fix this error:
+
+1. Make sure Python is installed on your system
+2. Create a `python_config.json` file with the full path to your Python executable
+3. Add your Python installation directory to your system PATH
+4. Use the PyInstaller packaged version which doesn't require Python
 
 ### Package Import Errors
 

@@ -8,20 +8,11 @@ def create_backend_launcher(backend_dir, has_source=True, python_path=None):
     """Create a launcher script that will run sql.py"""
     backend_launcher = os.path.join(backend_dir, "run_backend.py")
     
-    # Always use only the hardcoded Python path
+    # Define the hardcoded Python path
     hardcoded_python_path = r"C:\Users\farha\anaconda3\envs\sqlbot\python.exe"
     
-    # Always use the hardcoded path no matter what
-    python_path = hardcoded_python_path
-    print(f"Using hardcoded Python path: {hardcoded_python_path}")
-    
-    # FIX: Normalize the path to use proper path separators
+    # Normalize the path to use proper path separators
     hardcoded_python_path = os.path.normpath(hardcoded_python_path)
-    
-    # Define ONLY the hardcoded conda path for the launcher script
-    potential_conda_paths = [
-        os.path.normpath(hardcoded_python_path)
-    ]
     
     # Write the launcher script content
     launcher_content = f"""
@@ -33,14 +24,8 @@ import time
 import glob
 import socket
 
-# Hard-coded python path that we know works - this is the ONLY path we will use
+# Hard-coded python path that we know works
 HARDCODED_PYTHON_PATH = {repr(hardcoded_python_path)}
-
-# We will always use only this path
-CONDA_PYTHON_PATH = {repr(hardcoded_python_path)}
-
-# Only include the hardcoded path in potential paths
-POTENTIAL_CONDA_PATHS = {repr([hardcoded_python_path])}
 
 def check_ollama_running(host="localhost", port=11434):
     \"\"\"Check if Ollama server is running by attempting to connect to its port.\"\"\"
@@ -55,29 +40,26 @@ def check_ollama_running(host="localhost", port=11434):
 
 def find_python_executable():
     \"\"\"Find a Python executable path that works on the system.\"\"\"
-    # Check if the hardcoded Python path exists
+    # If the hardcoded Python path exists, ALWAYS use it first
     if os.path.exists(HARDCODED_PYTHON_PATH):
         print(f"Using hardcoded Python path: {{HARDCODED_PYTHON_PATH}}")
         return HARDCODED_PYTHON_PATH
     
-    # If hardcoded path doesn't exist, look for Python in PATH
-    print("Hardcoded Python path not found. Looking for Python in PATH...")
+    # If the hardcoded path doesn't exist, look for Python in common paths
+    print("Hardcoded Python path not found. Looking for specific Python paths...")
     
-    # List of possible Python executable names
-    python_names = ["python", "python3", "py"]
-    if platform.system() == "Windows":
-        python_names.extend(["py.exe", "python.exe", "python3.exe"])
-    
-    # Check common Python installation paths
+    # Check common installation paths, focusing on full paths first
     common_paths = []
     if platform.system() == "Windows":
         # Add common Windows Python installation paths
-        for version in ["38", "39", "310", "311", "312"]:
+        for version in ["311", "310", "39", "38", "312"]:
             common_paths.extend([
                 os.path.join("C:\\", "Program Files", f"Python{{version}}", "python.exe"),
                 os.path.join("C:\\", "Program Files (x86)", f"Python{{version}}", "python.exe"),
                 os.path.join(os.path.expanduser("~"), "AppData", "Local", "Programs", "Python", f"Python{{version}}", "python.exe")
             ])
+        # Add msys2 path that was found in the user's environment
+        common_paths.append(r"C:\msys64\mingw64\bin\python.exe")
     elif platform.system() == "Darwin":  # macOS
         common_paths.extend([
             "/usr/bin/python3",
@@ -90,25 +72,11 @@ def find_python_executable():
             "/usr/local/bin/python3"
         ])
     
-    # Try PATH first
-    for name in python_names:
-        try:
-            # Check if the Python command exists in PATH
-            print(f"Checking if {{name}} is in PATH...")
-            result = subprocess.run([name, "--version"], 
-                                   capture_output=True, 
-                                   text=True,
-                                   timeout=5)
-            if result.returncode == 0:
-                print(f"Found working Python in PATH: {{name}}")
-                return name  # Return just the name since it's in PATH
-        except (subprocess.SubprocessError, FileNotFoundError):
-            pass
-    
-    # Try common paths
+    # Try specific paths first - we want full absolute paths!
     for path in common_paths:
         if os.path.exists(path):
             try:
+                # Test if the Python executable works
                 result = subprocess.run([path, "--version"], 
                                        capture_output=True, 
                                        text=True,
@@ -119,15 +87,37 @@ def find_python_executable():
             except subprocess.SubprocessError:
                 pass
     
+    # As a last resort, try to find Python in PATH
+    python_names = ["python.exe", "python3.exe", "py.exe", "python", "python3", "py"]
+    
+    for name in python_names:
+        try:
+            # Try to get the full path of the Python command
+            if platform.system() == "Windows":
+                path_cmd = f"where {{name}}"
+            else:
+                path_cmd = f"which {{name}}"
+                
+            result = subprocess.run(path_cmd, shell=True, capture_output=True, text=True)
+            
+            if result.returncode == 0 and result.stdout.strip():
+                full_path = result.stdout.strip().split('\\n')[0]
+                if os.path.exists(full_path):
+                    print(f"Found Python in PATH: {{full_path}}")
+                    return full_path
+        except subprocess.SubprocessError:
+            pass
+    
     # If we get here, we couldn't find a working Python
     print("WARNING: Could not find a working Python executable.")
     print("The application may not function correctly.")
+    print("Returning 'python' as a last resort, but this may not work.")
     
-    # Return a basic command as last resort
+    # Return a basic command as last resort - but this likely won't work
     return "python"
 
 def run_backend():
-    \"\"\"Run the backend server using the hardcoded Python executable.\"\"\"
+    \"\"\"Run the backend server using the best available Python executable.\"\"\"
     # Get the directory where this script is located
     script_dir = os.path.dirname(os.path.abspath(__file__))
     
@@ -142,7 +132,7 @@ def run_backend():
     print(f"Working directory: {{os.getcwd()}}")
     print(f"System platform: {{platform.platform()}}")
     
-    # Find a working Python executable
+    # Find a working Python executable - ALWAYS use the full absolute path
     python_exe = find_python_executable()
     print(f"Using Python executable: {{python_exe}}")
 
@@ -217,10 +207,7 @@ def run_backend():
                 startup_info.dwFlags |= subprocess.STARTF_USESHOWWINDOW
                 startup_info.wShowWindow = 0  # SW_HIDE
             
-            # Use shell=True on Windows to make sure the python command is found
-            use_shell = platform.system() == "Windows"
-            
-            # Build command with full paths to be safer
+            # CRITICAL: Always use the full path to Python, never just 'python'
             cmd = [python_exe, api_routes_path]
             print(f"Executing command: {{cmd}}")
             
@@ -235,6 +222,8 @@ def run_backend():
                 # Use this as our command instead
                 cmd = bat_path
                 use_shell = True
+            else:
+                use_shell = False
             
             # Start the process
             process = subprocess.Popen(
@@ -276,10 +265,7 @@ def run_backend():
                 startup_info.dwFlags |= subprocess.STARTF_USESHOWWINDOW
                 startup_info.wShowWindow = 0  # SW_HIDE
             
-            # Use shell=True on Windows
-            use_shell = platform.system() == "Windows"
-            
-            # Build command with full path
+            # CRITICAL: Always use the full path to Python
             cmd = [python_exe, sql_path]
             
             # Create a .bat file on Windows with ABSOLUTE path for more reliable execution
@@ -293,6 +279,8 @@ def run_backend():
                 # Use this as our command instead
                 cmd = bat_path
                 use_shell = True
+            else:
+                use_shell = False
             
             process = subprocess.Popen(
                 cmd,
@@ -350,5 +338,29 @@ if __name__ == "__main__":
     
     print(f"Created backend launcher script: {backend_launcher}")
     
+    # Create a batch file for Windows to run the launcher
+    if platform.system() == "Windows":
+        batch_path = os.path.join(backend_dir, "run_backend.bat")
+        with open(batch_path, 'w') as f:
+            f.write("@echo off\r\n")
+            f.write("echo Starting SQL Sage Backend...\r\n")
+            
+            # First check if python.exe is in the same directory
+            f.write("if exist \"%~dp0python.exe\" (\r\n")
+            f.write("    echo Using bundled Python executable\r\n")
+            f.write("    \"%~dp0python.exe\" \"%~dp0run_backend.py\"\r\n")
+            f.write(") else (\r\n")
+            
+            # If there's a Python executable found during packaging, use it
+            if python_path and os.path.exists(python_path):
+                f.write(f"    echo Using detected Python: {python_path}\r\n")
+                f.write(f"    \"{python_path}\" \"%~dp0run_backend.py\"\r\n")
+            else:
+                # Otherwise, use any Python in PATH
+                f.write("    echo Searching for Python in system...\r\n")
+                # Try to use Python from PATH
+                f.write("    python \"%~dp0run_backend.py\"\r\n")
+            
+            f.write(")\r\n")
+    
     return backend_dir
-
