@@ -54,7 +54,7 @@ If you prefer to package manually or the automated script fails:
 
 5. **Create the final package:**
    - Copy the Electron app from `electron-dist` to your distribution folder
-   - Include the `OLLAMA_SETUP.txt` instructions
+   - Include the `DIST_README.md` and `OLLAMA_SETUP.txt` instructions
 
 ## Distribution to End Users
 
@@ -84,6 +84,31 @@ SQL Sage now supports two packaging methods for the backend:
 
 The packaging script automatically tries to use PyInstaller first, falling back to the Python script method if necessary.
 
+## Troubleshooting Backend Startup Issues
+
+If the backend closes immediately after launch:
+
+1. **Run the backend manually:**
+   - Open a command prompt/terminal
+   - Navigate to the backend directory
+   - Run `run_backend.bat` (Windows) or `python run_backend.py` (Mac/Linux)
+   - This will show any error messages in the console
+
+2. **Check for error files:**
+   - Look in the backend directory for files ending with `.err`
+   - These contain error information that can help diagnose issues
+
+3. **Common backend startup issues:**
+   - **Missing dependencies:** The executable might be missing required DLLs
+   - **Ollama not running:** The backend requires Ollama to be running
+   - **Port conflict:** Another application might be using port 3001 or 5000
+   - **Antivirus interference:** Some antivirus software might block the executable
+
+4. **For the Python script method:**
+   - Make sure Python is installed
+   - Check if all required packages are installed
+   - Create a `python_config.json` file with the absolute path to your Python executable
+
 ## Python Path Handling
 
 When using the Python script method (fallback), the application:
@@ -95,30 +120,6 @@ When using the Python script method (fallback), the application:
 5. Only as a last resort uses the command 'python'
 
 This approach minimizes the risk of "spawn python ENOENT" errors that occur when the system can't find the Python executable.
-
-## Customization
-
-To customize the packaged application:
-
-- Edit `.env` to change the default model or port
-- Modify `electron.js` for Electron-specific settings
-- If using the Python script method and you need a specific Python path, you can create a `python_config.json` file with:
-  ```json
-  {
-    "python_path": "C:\\path\\to\\your\\python.exe"
-  }
-  ```
-
-## Troubleshooting
-
-- If PyInstaller packaging fails, the system will automatically fall back to the Python script method
-- For users experiencing "ENOENT" errors with the Python script method:
-  - Ensure Python is installed and in their PATH
-  - Create a `python_config.json` file with the absolute path to their Python executable
-  - Or use the PyInstaller version which doesn't require Python
-- The start_sql_sage.bat script includes detailed Python detection and will show which Python it found
-- For Ollama connection issues, check the setup instructions in OLLAMA_SETUP.txt
-- If the PyInstaller executable doesn't start, check for error files in the backend directory
 
 ## Testing Your Package
 

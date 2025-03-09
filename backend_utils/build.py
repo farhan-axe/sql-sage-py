@@ -166,6 +166,8 @@ def run_backend():
         with open(os.path.join(script_dir, "ollama_not_running.err"), "w") as f:
             f.write("Ollama service is not running. Please start Ollama and restart the application.")
         
+        # Wait for user input before exiting - prevents window from closing immediately
+        input("Press Enter to exit...")
         sys.exit(78)  # Custom error code to indicate Ollama not running
     else:
         print("Ollama service appears to be running.")
@@ -179,14 +181,29 @@ def run_backend():
     
     print(f"Starting backend executable: {backend_exe}")
     
-    # On Windows, use the appropriate method to hide the console window
-    startup_info = None
+    # On Windows, create a CMD console that stays open
     if platform.system() == "Windows":
-        startup_info = subprocess.STARTUPINFO()
-        startup_info.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-        startup_info.wShowWindow = 0  # SW_HIDE
+        try:
+            # First try running with console visible to see any errors
+            print("Starting backend with visible console for troubleshooting...")
+            cmd = f'start cmd /k "\\"{backend_exe}\\" & echo Backend exited with code %errorlevel% & pause"'
+            subprocess.Popen(cmd, shell=True)
+            print("Backend started. Check the console window for any errors.")
+            # Don't hide this console window, so the user can see any errors
+            return
+        except Exception as e:
+            print(f"Error starting backend with visible console: {e}")
+            print("Trying alternative startup method...")
     
+    # Regular startup method (for non-Windows or if the above failed)
     try:
+        # On Windows, use the appropriate method to hide the console window
+        startup_info = None
+        if platform.system() == "Windows":
+            startup_info = subprocess.STARTUPINFO()
+            startup_info.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            startup_info.wShowWindow = 0  # SW_HIDE
+        
         process = subprocess.Popen(
             backend_exe,
             shell=False,
@@ -208,6 +225,8 @@ def run_backend():
             with open(os.path.join(script_dir, "backend_start_failed.err"), "w") as f:
                 f.write(f"Backend process failed to start\\n\\nDetails:\\n{stderr}")
             
+            # Wait for user input before exiting - prevents window from closing immediately
+            input("Press Enter to exit...")
             sys.exit(1)
         else:
             print("Backend process started successfully")
@@ -219,62 +238,37 @@ def run_backend():
         with open(os.path.join(script_dir, "backend_error.err"), "w") as f:
             f.write(f"Error starting backend: {e}\\n\\n{traceback.format_exc()}")
         
+        # Wait for user input before exiting - prevents window from closing immediately
+        input("Press Enter to exit...")
         sys.exit(1)
 
 if __name__ == "__main__":
-    run_backend()
+    try:
+        run_backend()
+    except Exception as e:
+        # Global exception handler to prevent the window from closing immediately
+        print(f"Unhandled exception: {e}")
+        import traceback
+        traceback.print_exc()
+        input("An error occurred. Press Enter to exit...")  # Keep the window open
 """
     
     with open(launcher_path, 'w') as f:
         f.write(launcher_content)
     
-    # Create a batch file for Windows
+    # Create a batch file for Windows that keeps the window open
     if platform.system() == "Windows":
         batch_path = os.path.join(backend_dir, "run_backend.bat")
         with open(batch_path, 'w') as f:
             f.write("@echo off\r\n")
             f.write("echo Starting SQL Sage Backend...\r\n")
             f.write("python run_backend.py\r\n")
+            f.write("if %ERRORLEVEL% NEQ 0 (\r\n")
+            f.write("  echo Backend failed to start with error code %ERRORLEVEL%\r\n")
+            f.write("  pause\r\n")
+            f.write(")\r\n")
     
     print(f"Created backend launcher script: {launcher_path}")
 
 def fallback_copy_files(source_backend_dir, backend_dir, python_path):
-    """Fallback method that copies files directly if PyInstaller fails"""
-    print("Using fallback method: Copying Python files directly")
-    
-    # Copy all Python files and .env file from the backend directory
-    files_to_copy = [f for f in os.listdir(source_backend_dir) 
-                    if f.endswith('.py') or f == '.env' or f.endswith('.json')]
-    
-    for file in files_to_copy:
-        src_file = os.path.join(source_backend_dir, file)
-        dest_file = os.path.join(backend_dir, file)
-        try:
-            shutil.copy2(src_file, dest_file)
-            print(f"Copied {file} to local backend directory")
-        except Exception as e:
-            print(f"Error copying {file}: {e}")
-    
-    # Copy requirements.txt if it exists
-    req_file = os.path.join(source_backend_dir, "requirements.txt")
-    if os.path.exists(req_file):
-        shutil.copy2(req_file, os.path.join(backend_dir, "requirements.txt"))
-        print("Copied requirements.txt to local backend directory")
-    else:
-        # Create a requirements.txt if it doesn't exist
-        with open(os.path.join(backend_dir, "requirements.txt"), 'w') as f:
-            f.write("fastapi>=0.68.0\nuvicorn>=0.15.0\npyodbc>=4.0.32\npython-dotenv>=0.19.1\nrequests>=2.26.0\n")
-        print("Created requirements.txt file")
-    
-    # Create a .env file if it doesn't exist
-    env_file = os.path.join(backend_dir, ".env")
-    if not os.path.exists(env_file):
-        with open(env_file, 'w') as f:
-            f.write("# Default configuration\nMODEL=deepseek-r1:8b\nPORT=5000\n")
-        print("Created .env file")
-    
-    # Create a run_backend.py file which will be our entry point
-    create_backend_launcher(backend_dir, python_path=python_path)
-    
-    print("Backend preparation complete!")
-    return backend_dir
+    # ... keep existing code (fallback file copying method)

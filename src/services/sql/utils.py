@@ -38,7 +38,7 @@ def find_python_executable():
         except Exception as e:
             print(f"Error loading Python config: {e}")
     
-    # Try the hardcoded path
+    # Try the hardcoded path as a second option - ensure this exists on your system!
     hardcoded_python_path = r"C:\Users\farha\anaconda3\envs\sqlbot\python.exe"
     if os.path.exists(hardcoded_python_path):
         print(f"Using hardcoded Python path: {hardcoded_python_path}")
