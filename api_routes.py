@@ -1,4 +1,3 @@
-
 from fastapi import FastAPI, HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
 import logging
@@ -17,6 +16,11 @@ print(f"Current directory: {os.getcwd()}")
 print(f"PYTHONPATH: {os.environ.get('PYTHONPATH', 'Not set')}")
 print(f"PATH: {os.environ.get('PATH', 'Not set')[:200]}...") # Show first 200 chars of PATH
 print(f"Conda environment: {os.environ.get('CONDA_PREFIX', 'Not in conda')}")
+
+# Use hardcoded Python path - add this line
+hardcoded_python_path = r"C:\Users\farha\anaconda3\envs\sqlbot\python.exe"
+print(f"Hardcoded Python path: {hardcoded_python_path}")
+print(f"Hardcoded Python exists: {os.path.exists(hardcoded_python_path)}")
 
 # ------------------------------ Load environment variables ------------------------------
 load_dotenv()
@@ -260,4 +264,6 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", "5000"))
     logger.info(f"Starting SQL Sage backend server on port {port}")
+    # Use the Python executable path for any subprocess calls
+    logger.info(f"Using Python executable: {hardcoded_python_path}")
     uvicorn.run(app, host="127.0.0.1", port=port)

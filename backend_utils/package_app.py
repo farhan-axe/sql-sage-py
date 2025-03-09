@@ -4,6 +4,7 @@ Main functionality for packaging the SQL Sage application.
 """
 import os
 import shutil
+import subprocess
 from .npm import find_npm
 from .frontend import build_frontend
 from .electron import setup_electron, build_electron_app, restore_package_json
@@ -14,6 +15,17 @@ def package_application():
     Package the SQL Sage application for distribution.
     """
     print("=== SQL Sage Packaging Script ===")
+    
+    # Hard-coded python path that we know works
+    hardcoded_python_path = r"C:\Users\farha\anaconda3\envs\sqlbot\python.exe"
+    print(f"Using hardcoded Python path: {hardcoded_python_path}")
+    
+    # Verify the Python path exists
+    if os.path.exists(hardcoded_python_path):
+        print(f"Python path verified: {hardcoded_python_path}")
+    else:
+        print(f"WARNING: Hardcoded Python path not found: {hardcoded_python_path}")
+        print("The packaging process may fail. Please check this path exists.")
     
     # Create a dist directory for our final output
     if not os.path.exists("final_package"):
@@ -65,6 +77,14 @@ def package_application():
         if os.path.exists(electron_js_path) and not os.path.exists(main_js_path):
             os.makedirs(os.path.dirname(main_js_path), exist_ok=True)
             shutil.copy(electron_js_path, main_js_path)
+        
+        # Create a batch file for starting the app using the hardcoded Python
+        batch_file_path = os.path.join(final_package_path, "start_sql_sage.bat")
+        with open(batch_file_path, 'w') as f:
+            f.write("@echo off\n")
+            f.write("echo Starting SQL Sage...\n")
+            f.write(f'set PYTHON_EXECUTABLE="{hardcoded_python_path}"\n')
+            f.write('"%~dp0SQL Sage.exe"\n')
         
         print(f"\n✅ Packaging complete! Your application is ready in: {final_package_path}")
         print("   Share this folder with users who want to run SQL Sage.")

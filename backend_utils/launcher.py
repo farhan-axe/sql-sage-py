@@ -165,8 +165,8 @@ def run_backend():
                 with open(bat_path, 'w') as f:
                     f.write("@echo off\\n")
                     f.write("echo Starting SQL Sage API with absolute path...\\n")
-                    # Use double quotes around paths to handle spaces
-                    f.write(f"\\"{{python_exe}}\\" \\"{{api_routes_path}}\\"\\n")
+                    # FIX: Use double quotes around paths to handle spaces AND ESCAPED BACKSLASHES
+                    f.write(f'"{HARDCODED_PYTHON_PATH}" "{api_routes_path}"\\n')
                 print(f"Created batch file with absolute paths: {{bat_path}}")
                 # Use this as our command instead
                 cmd = bat_path
@@ -224,8 +224,8 @@ def run_backend():
                 with open(bat_path, 'w') as f:
                     f.write("@echo off\\n")
                     f.write("echo Starting SQL Sage API (sql.py) with absolute path...\\n")
-                    # Use double quotes around paths to handle spaces
-                    f.write(f"\\"{{python_exe}}\\" \\"{{sql_path}}\\"\\n")
+                    # FIX: Use double quotes around paths to handle spaces AND ESCAPED BACKSLASHES
+                    f.write(f'"{HARDCODED_PYTHON_PATH}" "{sql_path}"\\n')
                 print(f"Created batch file with absolute paths: {{bat_path}}")
                 # Use this as our command instead
                 cmd = bat_path
