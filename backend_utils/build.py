@@ -1,3 +1,4 @@
+
 import os
 import shutil
 import subprocess
@@ -250,6 +251,24 @@ if __name__ == "__main__":
         import traceback
         traceback.print_exc()
         input("An error occurred. Press Enter to exit...")  # Keep the window open
+"""
+    
+    with open(launcher_path, 'w') as f:
+        f.write(launcher_content)
+    
+    # Create a batch file for Windows that keeps the window open
+    if platform.system() == "Windows":
+        batch_path = os.path.join(backend_dir, "run_backend.bat")
+        with open(batch_path, 'w') as f:
+            f.write("@echo off\r\n")
+            f.write("echo Starting SQL Sage Backend...\r\n")
+            f.write("python run_backend.py\r\n")
+            f.write("if %ERRORLEVEL% NEQ 0 (\r\n")
+            f.write("  echo Backend failed to start with error code %ERRORLEVEL%\r\n")
+            f.write("  pause\r\n")
+            f.write(")\r\n")
+    
+    print(f"Created backend launcher script: {launcher_path}")
 
 def fallback_copy_files(source_backend_dir, backend_dir, python_path):
     """
