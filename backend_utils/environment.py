@@ -127,3 +127,4 @@ def find_python_executable():
     
     # As a last resort, return a basic command
     return "python" if platform.system() == "Windows" else "python3"
+
