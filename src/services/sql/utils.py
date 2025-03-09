@@ -24,6 +24,11 @@ def check_ollama_running(host="localhost", port=11434):
 
 def find_python_executable():
     """Find a valid Python executable path for Electron to use."""
+    # First try the specific path for the user's environment
+    user_specific_path = r"C:\Users\farha\anaconda3\envs\sqlbot\python.exe"
+    if os.path.exists(user_specific_path):
+        return user_specific_path
+    
     # Check if we're running in a conda environment
     conda_prefix = os.environ.get('CONDA_PREFIX')
     if conda_prefix:
@@ -115,6 +120,11 @@ def detect_conda_environment():
     Detect if we're in a conda environment and get its details.
     Returns a tuple of (is_conda_env, python_path, env_name)
     """
+    # First try the specific path known to work
+    user_specific_path = r"C:\Users\farha\anaconda3\envs\sqlbot\python.exe"
+    if os.path.exists(user_specific_path):
+        return (True, user_specific_path, "sqlbot")
+    
     # Check if we're in a conda environment
     conda_prefix = os.environ.get('CONDA_PREFIX')
     env_name = os.environ.get('CONDA_DEFAULT_ENV')
