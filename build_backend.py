@@ -231,8 +231,9 @@ def create_backend_launcher(backend_dir, has_source=True, python_path=None):
             "/opt/miniconda3/envs/sqlbot/bin/python"
         ]
     
-    # Write the launcher script's content in multiple parts to avoid unterminated string issues
-    launcher_content = f"""
+    # Write the launcher script content in parts to avoid unterminated string issues
+    # Part 1: Import section and initial functions
+    launcher_content_part1 = f"""
 import os
 import sys
 import subprocess
@@ -259,11 +260,10 @@ def check_ollama_running(host="localhost", port=11434):
         return False  # Any exception means Ollama is not accessible
 """
 
-    # Adding more content
-    launcher_content += """
+    # Part 2: Python executable finder function
+    launcher_content_part2 = """
 def find_python_executable():
-    """
-    launcher_content += '"'*3 + "Find the Python executable to use." + '"'*3 + """
+    \"\"\"Find the Python executable to use.\"\"\"
     # First try the hard-coded path from build time
     if os.path.exists(CONDA_PYTHON_PATH):
         print(f"Using conda Python: {CONDA_PYTHON_PATH}")
@@ -298,8 +298,8 @@ def find_python_executable():
         print("Failed to get conda environments via command")
 """
 
-    # Adding more content
-    launcher_content += """    
+    # Part 3: Python executable finder function (continued)
+    launcher_content_part3 = """    
     # Check our potential conda paths
     for path in POTENTIAL_CONDA_PATHS:
         if os.path.exists(path):
@@ -323,8 +323,8 @@ def find_python_executable():
             continue
 """
 
-    # Adding more content
-    launcher_content += """    
+    # Part 4: Python executable finder function (continued)
+    launcher_content_part4 = """    
     # Check common locations for Python
     if platform.system() == "Windows":
         common_paths = [
@@ -354,8 +354,8 @@ def find_python_executable():
             return path
 """
 
-    # Adding more content
-    launcher_content += """            
+    # Part 5: Python executable finder function (continued) and glob search
+    launcher_content_part5 = """            
     # Look for Python in Program Files and other common locations
     if platform.system() == "Windows":
         python_glob_patterns = [
@@ -377,11 +377,10 @@ def find_python_executable():
     return "python" if platform.system() == "Windows" else "python3"
 """
 
-    # Adding the run_backend function
-    launcher_content += """
+    # Part 6: Backend runner function
+    launcher_content_part6 = """
 def run_backend():
-    """
-    launcher_content += '"'*3 + "Run the backend server using the found Python executable." + '"'*3 + """
+    \"\"\"Run the backend server using the found Python executable.\"\"\"
     # Get the directory where this script is located
     script_dir = os.path.dirname(os.path.abspath(__file__))
     
@@ -397,13 +396,10 @@ def run_backend():
     print(f"System platform: {platform.platform()}")
     print("Python paths checked:")
     
-    # Fixed path iteration - properly define paths to check
+    # Fixed path iteration - iterate through our defined list of paths
     for check_path in [CONDA_PYTHON_PATH] + POTENTIAL_CONDA_PATHS:
         print(f"  - {check_path}: {'EXISTS' if os.path.exists(check_path) else 'NOT FOUND'}")
-"""
 
-    # Final part of the launcher content
-    launcher_content += """    
     # Check if Ollama is running
     if not check_ollama_running():
         print("WARNING: Ollama service appears to be not running on the default port (11434).")
@@ -420,7 +416,10 @@ def run_backend():
         # Remove error file if it exists
         if os.path.exists(os.path.join(script_dir, "ollama_not_running.err")):
             os.remove(os.path.join(script_dir, "ollama_not_running.err"))
-    
+"""
+
+    # Part 7: Python testing and fallback
+    launcher_content_part7 = """    
     # Find the python executable
     python_exe = find_python_executable()
     print(f"Using Python executable: {python_exe}")
@@ -455,9 +454,9 @@ def run_backend():
                     except:
                         pass
 """
-
-    # Final part of the launcher content
-    launcher_content += """    
+ 
+    # Part 8: Package installation and backend start
+    launcher_content_part8 = """    
         # First, check if necessary packages are installed
         print("Checking if required packages are installed...")
         check_cmd = [python_exe, "-c", "import fastapi, uvicorn; print('Packages are available')"]
@@ -547,8 +546,8 @@ def run_backend():
             return
 """
 
-    # Final part of the launcher content to handle sql.py fallback
-    launcher_content += """        
+    # Part 9: sql.py fallback and error handling
+    launcher_content_part9 = """        
         # Check if sql.py exists as fallback
         sql_path = os.path.join(script_dir, "sql.py")
         if os.path.exists(sql_path):
@@ -607,10 +606,7 @@ def run_backend():
             else:
                 print("Backend process started successfully")
             return
-"""
-
-    # Error handling part
-    launcher_content += """        
+        
         print("ERROR: Could not find api_routes.py or sql.py. Backend cannot start.")
         
         # Write an error file that the main app can detect
@@ -633,6 +629,19 @@ def run_backend():
 if __name__ == "__main__":
     run_backend()
 """
+
+    # Combine all parts
+    launcher_content = (
+        launcher_content_part1 + 
+        launcher_content_part2 + 
+        launcher_content_part3 + 
+        launcher_content_part4 + 
+        launcher_content_part5 + 
+        launcher_content_part6 + 
+        launcher_content_part7 + 
+        launcher_content_part8 + 
+        launcher_content_part9
+    )
     
     # Write the backend launcher script
     with open(backend_launcher, 'w') as f:

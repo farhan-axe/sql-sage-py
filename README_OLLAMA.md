@@ -79,6 +79,14 @@ You can customize the model used by:
   - Try running `python --version` in a terminal to verify it works
   - On Windows, you may need to reinstall Python and check "Add Python to PATH" during installation
 
+- For Conda users:
+  - If you're using a conda environment (like "sqlbot"), you might need to deactivate it before running the packaging script:
+    ```
+    conda deactivate
+    python package_app.py
+    ```
+  - Alternatively, ensure your base Python is properly configured in PATH
+
 - If packages are missing, manually install them:
   ```bash
   pip install fastapi uvicorn pyodbc requests python-dotenv
