@@ -11,14 +11,9 @@ def create_backend_launcher(backend_dir, has_source=True, python_path=None):
     # Use the user's specific conda Python path that we know works
     hardcoded_python_path = r"C:\Users\farha\anaconda3\envs\sqlbot\python.exe"
     
-    # If the hardcoded path exists, use it; otherwise fall back to the provided path
-    if os.path.exists(hardcoded_python_path):
-        python_path = hardcoded_python_path
-        print(f"Using known working Python path: {python_path}")
-    elif not python_path:
-        # If no python_path provided, use system executable as fallback
-        import sys
-        python_path = sys.executable
+    # Always use the hardcoded path no matter what
+    python_path = hardcoded_python_path
+    print(f"Using known working Python path: {python_path}")
     
     # FIX: Normalize the path to use proper path separators
     python_path = os.path.normpath(python_path)
@@ -54,7 +49,7 @@ import socket
 # Hard-coded python path that we know works
 HARDCODED_PYTHON_PATH = {repr(hardcoded_python_path)}
 
-# Backup python path from build time
+# Always use the hardcoded path no matter what
 CONDA_PYTHON_PATH = {repr(python_path)}
 
 # List of potential conda Python paths with 'sqlbot' environment
@@ -73,113 +68,9 @@ def check_ollama_running(host="localhost", port=11434):
 
 def find_python_executable():
     \"\"\"Find the Python executable to use.\"\"\"
-    # First try the hardcoded path that we know works
-    if os.path.exists(HARDCODED_PYTHON_PATH):
-        print(f"Using hardcoded Python path: {{HARDCODED_PYTHON_PATH}}")
-        return HARDCODED_PYTHON_PATH
-    
-    # Then try the path from build time
-    if os.path.exists(CONDA_PYTHON_PATH):
-        print(f"Using conda Python: {{CONDA_PYTHON_PATH}}")
-        return CONDA_PYTHON_PATH
-    
-    # Check if we're running in a conda environment
-    conda_prefix = os.environ.get('CONDA_PREFIX')
-    if conda_prefix:
-        if platform.system() == "Windows":
-            conda_python = os.path.join(conda_prefix, "python.exe")
-        else:
-            conda_python = os.path.join(conda_prefix, "bin", "python")
-        
-        if os.path.exists(conda_python):
-            print(f"Found conda Python: {{conda_python}}")
-            return conda_python
-    
-    # Try to get conda environments
-    try:
-        # Try to detect conda environments using conda command
-        conda_cmd = "conda.exe" if platform.system() == "Windows" else "conda"
-        result = subprocess.run([conda_cmd, "env", "list"], capture_output=True, text=True)
-        if result.returncode == 0:
-            for line in result.stdout.splitlines():
-                if 'sqlbot' in line:
-                    env_path = line.split()[-1]  # Path is usually the last item
-                    python_path = os.path.join(env_path, "python.exe" if platform.system() == "Windows" else "bin/python")
-                    if os.path.exists(python_path):
-                        print(f"Found conda Python from env list: {{python_path}}")
-                        return python_path
-    except:
-        print("Failed to get conda environments via command")
-    
-    # Check our potential conda paths
-    for path in POTENTIAL_CONDA_PATHS:
-        if os.path.exists(path):
-            print(f"Found Python at preset location: {{path}}")
-            return path
-    
-    # Check system PATH python locations
-    python_cmds = ["python", "python3"]
-    if platform.system() == "Windows":
-        python_cmds = ["python.exe", "py"]
-    
-    for cmd in python_cmds:
-        try:
-            result = subprocess.run([cmd, "--version"], 
-                                  capture_output=True, 
-                                  text=True)
-            if result.returncode == 0:
-                print(f"Found Python in PATH: {{cmd}}")
-                return cmd
-        except FileNotFoundError:
-            continue
-    
-    # Check common locations for Python
-    if platform.system() == "Windows":
-        common_paths = [
-            r"C:\\Python39\\python.exe",
-            r"C:\\Python310\\python.exe",
-            r"C:\\Program Files\\Python39\\python.exe",
-            r"C:\\Program Files\\Python310\\python.exe",
-            r"C:\\Program Files (x86)\\Python39\\python.exe",
-            r"C:\\Program Files (x86)\\Python310\\python.exe",
-            # Add conda paths
-            os.path.expanduser(r"~\\miniconda3\\python.exe"),
-            os.path.expanduser(r"~\\anaconda3\\python.exe"),
-        ]
-    else:
-        common_paths = [
-            "/usr/bin/python3",
-            "/usr/local/bin/python3",
-            "/opt/homebrew/bin/python3",
-            # Add conda paths
-            os.path.expanduser("~/miniconda3/bin/python"),
-            os.path.expanduser("~/anaconda3/bin/python"),
-        ]
-    
-    for path in common_paths:
-        if os.path.exists(path):
-            print(f"Found Python at common location: {{path}}")
-            return path
-            
-    # Look for Python in Program Files and other common locations
-    if platform.system() == "Windows":
-        python_glob_patterns = [
-            "C:\\\\Python*\\\\python.exe",
-            "C:\\\\Program Files\\\\Python*\\\\python.exe",
-            "C:\\\\Program Files (x86)\\\\Python*\\\\python.exe",
-            os.path.join(os.environ.get('LOCALAPPDATA', ''), "Programs", "Python", "Python*", "python.exe")
-        ]
-        
-        for pattern in python_glob_patterns:
-            matches = glob.glob(pattern)
-            if matches:
-                # Sort to get the latest version
-                matches.sort(reverse=True)
-                print(f"Found Python via glob: {{matches[0]}}")
-                return matches[0]
-    
-    # As a last resort, try to use the python command directly
-    return "python" if platform.system() == "Windows" else "python3"
+    # Always use the hardcoded Python path
+    print(f"Using hardcoded Python path: {{HARDCODED_PYTHON_PATH}}")
+    return HARDCODED_PYTHON_PATH
 
 def run_backend():
     \"\"\"Run the backend server using the found Python executable.\"\"\"
@@ -196,17 +87,8 @@ def run_backend():
     # Print diagnostic information
     print(f"Working directory: {{os.getcwd()}}")
     print(f"System platform: {{platform.platform()}}")
-    print("Python paths checked:")
-    
-    # Always check the hardcoded path first
-    paths_to_check = [HARDCODED_PYTHON_PATH, CONDA_PYTHON_PATH] + POTENTIAL_CONDA_PATHS
-    
-    # Make sure we don't have duplicates
-    checked_paths = set()
-    for path in paths_to_check:
-        if path not in checked_paths:
-            checked_paths.add(path)
-            print(f"  - {{path}}: {'EXISTS' if os.path.exists(path) else 'NOT FOUND'}")
+    print("Using hardcoded Python path:", HARDCODED_PYTHON_PATH)
+    print("Exists:", "YES" if os.path.exists(HARDCODED_PYTHON_PATH) else "NO")
 
     # Check if Ollama is running
     if not check_ollama_running():
@@ -225,8 +107,8 @@ def run_backend():
         if os.path.exists(os.path.join(script_dir, "ollama_not_running.err")):
             os.remove(os.path.join(script_dir, "ollama_not_running.err"))
     
-    # Find the python executable
-    python_exe = find_python_executable()
+    # Use the hardcoded Python executable
+    python_exe = HARDCODED_PYTHON_PATH
     print(f"Using Python executable: {{python_exe}}")
     
     # Create a simple test to validate Python works
@@ -246,18 +128,6 @@ def run_backend():
         except Exception as e:
             print(f"Python test error: {{e}}")
             print("Warning: Python test failed, but continuing anyway")
-            # Try to find an alternative Python
-            for alt_path in [HARDCODED_PYTHON_PATH] + POTENTIAL_CONDA_PATHS:
-                if os.path.exists(alt_path) and alt_path != python_exe:
-                    print(f"Trying alternative Python: {{alt_path}}")
-                    try:
-                        result = subprocess.run([alt_path, test_script], capture_output=True, text=True, timeout=5)
-                        if result.returncode == 0:
-                            print(f"Alternative Python works! Using: {{alt_path}}")
-                            python_exe = alt_path
-                            break
-                    except:
-                        pass
     
         # First, check if necessary packages are installed
         print("Checking if required packages are installed...")
@@ -462,4 +332,3 @@ if __name__ == "__main__":
     print(f"Created backend launcher script: {backend_launcher}")
     
     return backend_dir
-
