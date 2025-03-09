@@ -8,33 +8,20 @@ def create_backend_launcher(backend_dir, has_source=True, python_path=None):
     """Create a launcher script that will run sql.py"""
     backend_launcher = os.path.join(backend_dir, "run_backend.py")
     
-    # Use the user's specific conda Python path that we know works
+    # Always use only the hardcoded Python path
     hardcoded_python_path = r"C:\Users\farha\anaconda3\envs\sqlbot\python.exe"
     
     # Always use the hardcoded path no matter what
     python_path = hardcoded_python_path
-    print(f"Using known working Python path: {python_path}")
+    print(f"Using hardcoded Python path: {hardcoded_python_path}")
     
     # FIX: Normalize the path to use proper path separators
-    python_path = os.path.normpath(python_path)
+    hardcoded_python_path = os.path.normpath(hardcoded_python_path)
     
-    # Define potential conda paths for later use in the launcher script
-    potential_conda_paths = []
-    if platform.system() == "Windows":
-        potential_conda_paths = [
-            os.path.normpath(hardcoded_python_path),  # User's path first
-            os.path.normpath(os.path.expanduser("~/anaconda3/envs/sqlbot/python.exe")),
-            os.path.normpath(os.path.expanduser("~/miniconda3/envs/sqlbot/python.exe")),
-            os.path.normpath(os.path.join(os.environ.get('USERPROFILE', ''), "anaconda3", "envs", "sqlbot", "python.exe")),
-            os.path.normpath(os.path.join(os.environ.get('USERPROFILE', ''), "miniconda3", "envs", "sqlbot", "python.exe"))
-        ]
-    else:
-        potential_conda_paths = [
-            os.path.normpath(os.path.expanduser("~/anaconda3/envs/sqlbot/bin/python")),
-            os.path.normpath(os.path.expanduser("~/miniconda3/envs/sqlbot/bin/python")),
-            os.path.normpath("/opt/anaconda3/envs/sqlbot/bin/python"),
-            os.path.normpath("/opt/miniconda3/envs/sqlbot/bin/python")
-        ]
+    # Define ONLY the hardcoded conda path for the launcher script
+    potential_conda_paths = [
+        os.path.normpath(hardcoded_python_path)
+    ]
     
     # Write the launcher script content
     launcher_content = f"""
@@ -46,14 +33,14 @@ import time
 import glob
 import socket
 
-# Hard-coded python path that we know works
+# Hard-coded python path that we know works - this is the ONLY path we will use
 HARDCODED_PYTHON_PATH = {repr(hardcoded_python_path)}
 
-# Always use the hardcoded path no matter what
-CONDA_PYTHON_PATH = {repr(python_path)}
+# We will always use only this path
+CONDA_PYTHON_PATH = {repr(hardcoded_python_path)}
 
-# List of potential conda Python paths with 'sqlbot' environment
-POTENTIAL_CONDA_PATHS = {repr(potential_conda_paths)}
+# Only include the hardcoded path in potential paths
+POTENTIAL_CONDA_PATHS = {repr([hardcoded_python_path])}
 
 def check_ollama_running(host="localhost", port=11434):
     \"\"\"Check if Ollama server is running by attempting to connect to its port.\"\"\"
@@ -67,13 +54,13 @@ def check_ollama_running(host="localhost", port=11434):
         return False  # Any exception means Ollama is not accessible
 
 def find_python_executable():
-    \"\"\"Find the Python executable to use.\"\"\"
-    # Always use the hardcoded Python path
+    \"\"\"Always return the hardcoded Python path.\"\"\"
+    # Only use the hardcoded Python path, nothing else
     print(f"Using hardcoded Python path: {{HARDCODED_PYTHON_PATH}}")
     return HARDCODED_PYTHON_PATH
 
 def run_backend():
-    \"\"\"Run the backend server using the found Python executable.\"\"\"
+    \"\"\"Run the backend server using the hardcoded Python executable.\"\"\"
     # Get the directory where this script is located
     script_dir = os.path.dirname(os.path.abspath(__file__))
     
@@ -107,7 +94,7 @@ def run_backend():
         if os.path.exists(os.path.join(script_dir, "ollama_not_running.err")):
             os.remove(os.path.join(script_dir, "ollama_not_running.err"))
     
-    # Use the hardcoded Python executable
+    # Always use only the hardcoded Python executable
     python_exe = HARDCODED_PYTHON_PATH
     print(f"Using Python executable: {{python_exe}}")
     
@@ -169,28 +156,11 @@ def run_backend():
             use_shell = platform.system() == "Windows"
             
             # Build command with full paths to be safer
-            if os.path.isabs(python_exe):
-                cmd = [python_exe, api_routes_path]
-            else:
-                # For Python commands like "python" or "python3" 
-                # Use shell=True to let the system find them
-                cmd = f"{{python_exe}} {{api_routes_path}}" if use_shell else [python_exe, api_routes_path]
-            
+            cmd = [python_exe, api_routes_path]
             print(f"Executing command: {{cmd}}")
             
-            # Create a .bat file on Windows as an alternative method
-            if platform.system() == "Windows" and not os.path.isabs(python_exe):
-                bat_path = os.path.join(script_dir, "run_api.bat")
-                with open(bat_path, 'w') as f:
-                    f.write(f"@echo off\\n")
-                    f.write(f"echo Starting SQL Sage API...\\n")
-                    f.write(f"{{python_exe}} {{api_routes_path}}\\n")
-                print(f"Created batch file: {{bat_path}}")
-                cmd = bat_path
-                use_shell = True
-            
             # Create a .bat file on Windows with ABSOLUTE path for more reliable execution
-            if platform.system() == "Windows" and os.path.isabs(python_exe):
+            if platform.system() == "Windows":
                 bat_path = os.path.join(script_dir, "run_api_absolute.bat")
                 with open(bat_path, 'w') as f:
                     f.write("@echo off\\n")
@@ -245,25 +215,11 @@ def run_backend():
             # Use shell=True on Windows
             use_shell = platform.system() == "Windows"
             
-            # Build command
-            if os.path.isabs(python_exe):
-                cmd = [python_exe, sql_path]
-            else:
-                cmd = f"{{python_exe}} {{sql_path}}" if use_shell else [python_exe, sql_path]
-            
-            # Create a .bat file on Windows
-            if platform.system() == "Windows" and not os.path.isabs(python_exe):
-                bat_path = os.path.join(script_dir, "run_sql.bat")
-                with open(bat_path, 'w') as f:
-                    f.write(f"@echo off\\n")
-                    f.write(f"echo Starting SQL Sage API (sql.py)...\\n")
-                    f.write(f"{{python_exe}} {{sql_path}}\\n")
-                print(f"Created batch file: {{bat_path}}")
-                cmd = bat_path
-                use_shell = True
+            # Build command with full path
+            cmd = [python_exe, sql_path]
             
             # Create a .bat file on Windows with ABSOLUTE path for more reliable execution
-            if platform.system() == "Windows" and os.path.isabs(python_exe):
+            if platform.system() == "Windows":
                 bat_path = os.path.join(script_dir, "run_sql_absolute.bat")
                 with open(bat_path, 'w') as f:
                     f.write("@echo off\\n")
