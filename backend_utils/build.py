@@ -1,4 +1,3 @@
-
 import os
 import shutil
 import subprocess
@@ -251,24 +250,42 @@ if __name__ == "__main__":
         import traceback
         traceback.print_exc()
         input("An error occurred. Press Enter to exit...")  # Keep the window open
-"""
-    
-    with open(launcher_path, 'w') as f:
-        f.write(launcher_content)
-    
-    # Create a batch file for Windows that keeps the window open
-    if platform.system() == "Windows":
-        batch_path = os.path.join(backend_dir, "run_backend.bat")
-        with open(batch_path, 'w') as f:
-            f.write("@echo off\r\n")
-            f.write("echo Starting SQL Sage Backend...\r\n")
-            f.write("python run_backend.py\r\n")
-            f.write("if %ERRORLEVEL% NEQ 0 (\r\n")
-            f.write("  echo Backend failed to start with error code %ERRORLEVEL%\r\n")
-            f.write("  pause\r\n")
-            f.write(")\r\n")
-    
-    print(f"Created backend launcher script: {launcher_path}")
 
 def fallback_copy_files(source_backend_dir, backend_dir, python_path):
-    # ... keep existing code (fallback file copying method)
+    """
+    Fallback method to copy Python files directly without using PyInstaller.
+    This is used when PyInstaller is not available or fails.
+    """
+    print("Using fallback method: copying Python files directly...")
+    
+    # Create the backend directory if it doesn't exist
+    if not os.path.exists(backend_dir):
+        os.makedirs(backend_dir)
+    
+    # Copy all Python files from source to backend directory
+    files_to_copy = [f for f in os.listdir(source_backend_dir) 
+                    if f.endswith('.py') or f == '.env' or f.endswith('.json') or f == 'requirements.txt']
+    
+    for file in files_to_copy:
+        src_file = os.path.join(source_backend_dir, file)
+        dest_file = os.path.join(backend_dir, file)
+        try:
+            shutil.copy2(src_file, dest_file)
+            print(f"Copied {file} to backend directory")
+        except Exception as e:
+            print(f"Error copying {file}: {e}")
+    
+    # Install requirements if they exist
+    req_file = os.path.join(backend_dir, "requirements.txt")
+    if os.path.exists(req_file):
+        try:
+            subprocess.check_call([python_path, "-m", "pip", "install", "-r", req_file])
+            print("Installed Python requirements")
+        except Exception as e:
+            print(f"Error installing requirements: {e}")
+    
+    # Create a launcher script for the Python backend
+    create_backend_launcher(backend_dir, python_path)
+    
+    print("Fallback copy complete!")
+    return backend_dir
