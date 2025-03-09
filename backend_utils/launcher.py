@@ -54,10 +54,77 @@ def check_ollama_running(host="localhost", port=11434):
         return False  # Any exception means Ollama is not accessible
 
 def find_python_executable():
-    \"\"\"Always return the hardcoded Python path.\"\"\"
-    # Only use the hardcoded Python path, nothing else
-    print(f"Using hardcoded Python path: {{HARDCODED_PYTHON_PATH}}")
-    return HARDCODED_PYTHON_PATH
+    \"\"\"Find a Python executable path that works on the system.\"\"\"
+    # Check if the hardcoded Python path exists
+    if os.path.exists(HARDCODED_PYTHON_PATH):
+        print(f"Using hardcoded Python path: {{HARDCODED_PYTHON_PATH}}")
+        return HARDCODED_PYTHON_PATH
+    
+    # If hardcoded path doesn't exist, look for Python in PATH
+    print("Hardcoded Python path not found. Looking for Python in PATH...")
+    
+    # List of possible Python executable names
+    python_names = ["python", "python3", "py"]
+    if platform.system() == "Windows":
+        python_names.extend(["py.exe", "python.exe", "python3.exe"])
+    
+    # Check common Python installation paths
+    common_paths = []
+    if platform.system() == "Windows":
+        # Add common Windows Python installation paths
+        for version in ["38", "39", "310", "311", "312"]:
+            common_paths.extend([
+                os.path.join("C:\\", "Program Files", f"Python{{version}}", "python.exe"),
+                os.path.join("C:\\", "Program Files (x86)", f"Python{{version}}", "python.exe"),
+                os.path.join(os.path.expanduser("~"), "AppData", "Local", "Programs", "Python", f"Python{{version}}", "python.exe")
+            ])
+    elif platform.system() == "Darwin":  # macOS
+        common_paths.extend([
+            "/usr/bin/python3",
+            "/usr/local/bin/python3",
+            "/opt/homebrew/bin/python3"
+        ])
+    else:  # Linux and other systems
+        common_paths.extend([
+            "/usr/bin/python3",
+            "/usr/local/bin/python3"
+        ])
+    
+    # Try PATH first
+    for name in python_names:
+        try:
+            # Check if the Python command exists in PATH
+            print(f"Checking if {{name}} is in PATH...")
+            result = subprocess.run([name, "--version"], 
+                                   capture_output=True, 
+                                   text=True,
+                                   timeout=5)
+            if result.returncode == 0:
+                print(f"Found working Python in PATH: {{name}}")
+                return name  # Return just the name since it's in PATH
+        except (subprocess.SubprocessError, FileNotFoundError):
+            pass
+    
+    # Try common paths
+    for path in common_paths:
+        if os.path.exists(path):
+            try:
+                result = subprocess.run([path, "--version"], 
+                                       capture_output=True, 
+                                       text=True,
+                                       timeout=5)
+                if result.returncode == 0:
+                    print(f"Found working Python at: {{path}}")
+                    return path
+            except subprocess.SubprocessError:
+                pass
+    
+    # If we get here, we couldn't find a working Python
+    print("WARNING: Could not find a working Python executable.")
+    print("The application may not function correctly.")
+    
+    # Return a basic command as last resort
+    return "python"
 
 def run_backend():
     \"\"\"Run the backend server using the hardcoded Python executable.\"\"\"
@@ -74,8 +141,10 @@ def run_backend():
     # Print diagnostic information
     print(f"Working directory: {{os.getcwd()}}")
     print(f"System platform: {{platform.platform()}}")
-    print("Using hardcoded Python path:", HARDCODED_PYTHON_PATH)
-    print("Exists:", "YES" if os.path.exists(HARDCODED_PYTHON_PATH) else "NO")
+    
+    # Find a working Python executable
+    python_exe = find_python_executable()
+    print(f"Using Python executable: {{python_exe}}")
 
     # Check if Ollama is running
     if not check_ollama_running():
@@ -93,10 +162,6 @@ def run_backend():
         # Remove error file if it exists
         if os.path.exists(os.path.join(script_dir, "ollama_not_running.err")):
             os.remove(os.path.join(script_dir, "ollama_not_running.err"))
-    
-    # Always use only the hardcoded Python executable
-    python_exe = HARDCODED_PYTHON_PATH
-    print(f"Using Python executable: {{python_exe}}")
     
     # Create a simple test to validate Python works
     test_script = os.path.join(script_dir, "test_python.py")
@@ -165,7 +230,6 @@ def run_backend():
                 with open(bat_path, 'w') as f:
                     f.write("@echo off\\n")
                     f.write("echo Starting SQL Sage API with absolute path...\\n")
-                    # Make sure to use the variable from the generated script
                     f.write(f'"{{python_exe}}" "{{api_routes_path}}"\\n')
                 print(f"Created batch file with absolute paths: {{bat_path}}")
                 # Use this as our command instead
@@ -224,7 +288,6 @@ def run_backend():
                 with open(bat_path, 'w') as f:
                     f.write("@echo off\\n")
                     f.write("echo Starting SQL Sage API (sql.py) with absolute path...\\n")
-                    # Make sure to use the variable from the generated script
                     f.write(f'"{{python_exe}}" "{{sql_path}}"\\n')
                 print(f"Created batch file with absolute paths: {{bat_path}}")
                 # Use this as our command instead
@@ -288,3 +351,4 @@ if __name__ == "__main__":
     print(f"Created backend launcher script: {backend_launcher}")
     
     return backend_dir
+

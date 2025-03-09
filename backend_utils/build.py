@@ -57,12 +57,12 @@ def build_backend():
             f.write("# Default configuration\nMODEL=deepseek-r1:8b\nPORT=5000\n")
         print("Created .env file")
     
-    # Always use only the hardcoded Python path
-    hardcoded_python_path = r"C:\Users\farha\anaconda3\envs\sqlbot\python.exe"
-    print(f"Using hardcoded Python path: {hardcoded_python_path}")
+    # Find a working Python executable
+    python_path = find_python_executable()
+    print(f"Using Python executable: {python_path}")
     
     # Create a run_backend.py file which will be our entry point
-    create_backend_launcher(backend_dir, python_path=hardcoded_python_path)
+    create_backend_launcher(backend_dir, python_path=python_path)
     
     print("Backend preparation complete!")
     return backend_dir

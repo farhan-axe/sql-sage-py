@@ -8,7 +8,7 @@ This guide explains how to package SQL Sage for distribution to end users.
 Before packaging:
 
 1. Make sure your development environment is set up correctly
-2. Install PyInstaller: `pip install pyinstaller`
+2. Make sure Python (3.8 or higher) is installed and accessible from the command line
 3. Install Node.js and npm (if not already installed)
 
 ## Packaging Steps
@@ -61,6 +61,18 @@ When distributing SQL Sage to end users:
 3. Make sure users know they need to install:
    - SQL Server ODBC Driver 17
    - Ollama with the DeepSeek model
+   - Python 3.8 or higher
+
+## How SQL Sage Finds Python
+
+The application is now smarter about finding Python:
+
+1. It first tries a hardcoded path from your development environment 
+2. If that fails, it looks for Python in the system PATH
+3. If Python still isn't found, it checks common installation locations
+4. As a last resort, it tries the basic "python" command
+
+This means users don't need to have Python installed at the exact same path as your development environment.
 
 ## Customization
 
@@ -68,10 +80,27 @@ To customize the packaged application:
 
 - Edit `.env` to change the default model or port
 - Modify `electron.js` for Electron-specific settings
-- Update `sql_sage.spec` for PyInstaller configurations
+- If you need to use a specific Python path, you can create a `python_config.json` file with:
+  ```json
+  {
+    "python_path": "C:\\path\\to\\your\\python.exe"
+  }
+  ```
 
 ## Troubleshooting
 
-- If packaging fails with missing dependencies, add them to the spec file
-- For platform-specific issues, see PyInstaller and Electron-builder documentation
-- Test your packaging on the same OS platform you're targeting for distribution
+- If packaging fails with missing dependencies, add them to the requirements.txt file
+- For users experiencing "ENOENT" errors, make sure they have Python installed and it's in their PATH
+- The start_sql_sage.bat script includes detailed Python detection and will show which Python it found
+- For Ollama connection issues, check the setup instructions in OLLAMA_SETUP.txt
+
+## Testing Your Package
+
+Before distributing:
+
+1. Test the package on a system without your development environment
+2. Make sure all dependencies are properly included
+3. Verify that Python detection works correctly
+4. Check that Ollama integration functions properly
+5. Test a sample SQL query to ensure the backend is working correctly
+

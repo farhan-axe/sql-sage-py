@@ -5,24 +5,34 @@ This document explains how to configure the Python path for SQL Sage.
 
 ## Current Configuration
 
-SQL Sage is currently configured to use the following Python path:
+SQL Sage is currently configured to try these Python paths in order:
 
-```
-C:\Users\farha\anaconda3\envs\sqlbot\python.exe
-```
-
-This path is hardcoded in multiple files to ensure consistent Python execution across the application.
+1. The hardcoded path: `C:\Users\farha\anaconda3\envs\sqlbot\python.exe`
+2. System Python available in PATH: `python`, `python3`, or `py`
+3. Common Python installation locations based on your operating system
 
 ## If You Need to Change the Python Path
 
-If you need to use a different Python environment, you'll need to update the path in the following files:
+If you need to use a specific Python environment, you have these options:
 
-1. `backend_utils/environment.py`
-2. `backend_utils/build.py`
-3. `backend_utils/launcher.py`
-4. `backend_utils/electron.py`
-5. `backend_utils/package_app.py`
-6. `src/services/sql/utils.py`
+1. **Modify the hardcoded path** in these files:
+   - `backend_utils/environment.py`
+   - `backend_utils/build.py`
+   - `backend_utils/launcher.py`
+   - `backend_utils/electron.py`
+   - `backend_utils/package_app.py`
+   - `src/services/sql/utils.py`
+
+2. **Let SQL Sage auto-detect Python** from your PATH (recommended)
+   - Make sure the Python you want to use is in your system PATH
+   - The application will automatically find and use it
+
+3. **Create a python_config.json file** in the application directory with:
+   ```json
+   {
+     "python_path": "C:\\path\\to\\your\\python.exe"
+   }
+   ```
 
 After updating these files, rebuild the application using:
 
@@ -35,14 +45,11 @@ python package_app.py
 To verify your Python environment is correctly configured:
 
 1. Open a Command Prompt or PowerShell window
-2. Run the following command with your Python path:
-   ```
-   "C:\Users\farha\anaconda3\envs\sqlbot\python.exe" --version
-   ```
+2. Run: `python --version`
 3. You should see a version number printed (e.g., "Python 3.8.5")
 4. Verify required packages are installed:
    ```
-   "C:\Users\farha\anaconda3\envs\sqlbot\python.exe" -c "import fastapi, uvicorn; print('OK')"
+   python -c "import fastapi, uvicorn; print('OK')"
    ```
 
 ## Common Issues
@@ -52,39 +59,31 @@ To verify your Python environment is correctly configured:
 If you see "spawn python ENOENT" errors, it means the application can't find the Python executable. This typically happens when:
 
 1. The Python path is incorrect or doesn't exist
-2. The application is looking for "python" instead of the full path
-3. Path separators are inconsistent (mixing / and \)
-4. Quotation marks are missing around paths with spaces
+2. The Python executable is not in your system PATH
+3. Python is installed but not properly configured
 
-### How the Path is Used
+### How SQL Sage Finds Python
 
-The Python path is used in several key processes:
+The application will search for Python in this order:
 
-1. In batch (.bat) files that are created to launch Python scripts
-2. In direct Node.js/Electron subprocess calls using `child_process.spawn()`
-3. In environment variables passed to various build scripts
-
-### Path Format Requirements
-
-For Windows paths, always ensure:
-
-1. Use double backslashes in JSON strings: `"C:\\Users\\name\\anaconda3\\python.exe"`
-2. Use raw strings in Python code: `r"C:\Users\name\anaconda3\python.exe"`
-3. Surround paths with double quotes in .bat files: `"C:\Users\name\anaconda3\python.exe"`
-4. Use normalized paths with `os.path.normpath()` before using them
+1. Hardcoded path (if it exists)
+2. System PATH (using commands like "python", "python3", "py")
+3. Common installation directories based on your operating system
+4. As a last resort, it will try to use just "python" and hope it works
 
 ### Package Import Errors
 
 If you see "No module named 'X'" errors, you need to install the required packages in your Python environment:
 
 ```bash
-"C:\Users\farha\anaconda3\envs\sqlbot\python.exe" -m pip install fastapi uvicorn pyodbc requests python-dotenv
+python -m pip install fastapi uvicorn pyodbc requests python-dotenv
 ```
 
 ## Troubleshooting Tips
 
-1. Always use the absolute path to Python when calling it from scripts or configuration files
-2. On Windows, use double quotes around paths to handle spaces in directory names
-3. Check that the Python executable exists before using it
-4. Verify the Python environment has all the required packages installed
-5. Look for any console logs or error files in the application directory for more details
+1. Make sure Python is installed and accessible from the command line
+2. On Windows, ensure Python is added to PATH during installation
+3. Check that the Python environment has all required packages installed
+4. Look for error files in the backend directory for more detailed error messages
+5. If you see permission errors, try running the application as administrator
+

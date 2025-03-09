@@ -8,6 +8,7 @@ import subprocess
 import platform
 from .build import build_backend
 from .npm import find_npm
+from .environment import find_python_executable
 
 def setup_electron():
     """Set up Electron packaging environment."""
@@ -53,12 +54,12 @@ def build_electron_app():
     """Build the Electron app package."""
     print("Building Electron app...")
     
-    # Hardcoded Python path
-    hardcoded_python_path = r"C:\Users\farha\anaconda3\envs\sqlbot\python.exe"
-    print(f"Using hardcoded Python path for Electron app: {hardcoded_python_path}")
+    # Find a working Python executable
+    python_path = find_python_executable()
+    print(f"Using Python executable for Electron app: {python_path}")
     
     # Set PYTHON_EXECUTABLE environment variable for the Electron build process
-    os.environ["PYTHON_EXECUTABLE"] = hardcoded_python_path
+    os.environ["PYTHON_EXECUTABLE"] = python_path
     
     # Build backend using the improved build_backend function
     backend_dir = build_backend()
@@ -68,7 +69,7 @@ def build_electron_app():
     try:
         import json
         with open(config_file, "w") as f:
-            json.dump({"python_path": hardcoded_python_path}, f, indent=2)
+            json.dump({"python_path": python_path}, f, indent=2)
         print(f"Created Python config file: {config_file}")
     except Exception as e:
         print(f"Warning: Could not create Python config file: {e}")
@@ -90,7 +91,7 @@ def build_electron_app():
             # First try building without CSC_IDENTITY_AUTO_DISCOVERY=false to skip code signing
             os.environ["CSC_IDENTITY_AUTO_DISCOVERY"] = "false"
             # Set the PYTHON_EXECUTABLE environment variable
-            os.environ["PYTHON_EXECUTABLE"] = hardcoded_python_path
+            os.environ["PYTHON_EXECUTABLE"] = python_path
             subprocess.check_call(electron_build_cmd)
         except subprocess.CalledProcessError as e:
             print(f"Error building Electron app: {e}")
@@ -121,7 +122,7 @@ def build_electron_app():
                 try:
                     import json
                     with open(config_file, "w") as f:
-                        json.dump({"python_path": hardcoded_python_path}, f, indent=2)
+                        json.dump({"python_path": python_path}, f, indent=2)
                     print(f"Created Python config file in fallback dir: {config_file}")
                 except Exception as e:
                     print(f"Warning: Could not create Python config file in fallback dir: {e}")
