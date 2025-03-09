@@ -54,6 +54,24 @@ If you see "spawn python ENOENT" errors, it means the application can't find the
 1. The Python path is incorrect or doesn't exist
 2. The application is looking for "python" instead of the full path
 3. Path separators are inconsistent (mixing / and \)
+4. Quotation marks are missing around paths with spaces
+
+### How the Path is Used
+
+The Python path is used in several key processes:
+
+1. In batch (.bat) files that are created to launch Python scripts
+2. In direct Node.js/Electron subprocess calls using `child_process.spawn()`
+3. In environment variables passed to various build scripts
+
+### Path Format Requirements
+
+For Windows paths, always ensure:
+
+1. Use double backslashes in JSON strings: `"C:\\Users\\name\\anaconda3\\python.exe"`
+2. Use raw strings in Python code: `r"C:\Users\name\anaconda3\python.exe"`
+3. Surround paths with double quotes in .bat files: `"C:\Users\name\anaconda3\python.exe"`
+4. Use normalized paths with `os.path.normpath()` before using them
 
 ### Package Import Errors
 
@@ -69,3 +87,4 @@ If you see "No module named 'X'" errors, you need to install the required packag
 2. On Windows, use double quotes around paths to handle spaces in directory names
 3. Check that the Python executable exists before using it
 4. Verify the Python environment has all the required packages installed
+5. Look for any console logs or error files in the application directory for more details
