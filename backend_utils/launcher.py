@@ -190,8 +190,8 @@ def run_backend():
     print("Python paths checked:")
     
     # Fixed path iteration - correctly iterate through our defined list of paths
-    for check_path in [CONDA_PYTHON_PATH] + POTENTIAL_CONDA_PATHS:
-        print(f"  - {{check_path}}: {'EXISTS' if os.path.exists(check_path) else 'NOT FOUND'}")
+    for path in [CONDA_PYTHON_PATH] + POTENTIAL_CONDA_PATHS:
+        print(f"  - {{path}}: {'EXISTS' if os.path.exists(path) else 'NOT FOUND'}")
 
     # Check if Ollama is running
     if not check_ollama_running():
@@ -447,3 +447,4 @@ if __name__ == "__main__":
     print(f"Created backend launcher script: {backend_launcher}")
     
     return backend_dir
+
