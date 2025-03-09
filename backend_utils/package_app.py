@@ -19,7 +19,7 @@ def find_python_executable():
     # Check if it exists
     if os.path.exists(hardcoded_python_path):
         print(f"Using hardcoded Python path: {hardcoded_python_path}")
-        return hardcoded_python_path
+        return os.path.normpath(hardcoded_python_path)
     
     # If not, search for Python in PATH
     print("Hardcoded Python path not found. Searching for Python in PATH...")
@@ -147,36 +147,46 @@ def package_application():
             os.makedirs(os.path.dirname(main_js_path), exist_ok=True)
             shutil.copy(electron_js_path, main_js_path)
         
-        # Create a batch file for starting the app that's more flexible with Python paths
+        # Create a batch file for starting the app with our standalone backend
         batch_file_path = os.path.join(final_package_path, "start_sql_sage.bat")
         with open(batch_file_path, 'w') as f:
             f.write("@echo off\n")
             f.write("echo Starting SQL Sage...\n")
             f.write("\n")
-            f.write("echo Searching for Python installation...\n")
             
-            # Search for Python installation
-            f.write("set PYTHON_FOUND=0\n")
+            # Find backend path
+            f.write("set BACKEND_DIR=%~dp0backend\n")
+            
+            # Run backend executable if available, otherwise try Python script
+            f.write("if exist \"%BACKEND_DIR%\\sql_sage_backend.exe\" (\n")
+            f.write("    echo Starting backend executable from: %BACKEND_DIR%\\sql_sage_backend.exe\n")
+            f.write("    \"%BACKEND_DIR%\\run_backend.py\"\n")
+            f.write(") else (\n")
+            f.write("    echo Executable not found, using Python script...\n")
+            f.write("    echo Searching for Python installation...\n")
+            
+            # Add Python detection logic for fallback
+            f.write("    set PYTHON_FOUND=0\n")
             
             # First check if Python is in PATH
-            f.write("where python >nul 2>nul\n")
-            f.write("if %ERRORLEVEL% EQU 0 (\n")
-            f.write("    echo Found Python in PATH: python\n")
-            f.write("    set PYTHON_EXECUTABLE=python\n")
-            f.write("    set PYTHON_FOUND=1\n")
-            f.write(")\n\n")
+            f.write("    where python >nul 2>nul\n")
+            f.write("    if %ERRORLEVEL% EQU 0 (\n")
+            f.write("        echo Found Python in PATH: python\n")
+            f.write("        set PYTHON_EXECUTABLE=python\n")
+            f.write("        set PYTHON_FOUND=1\n")
+            f.write("    )\n\n")
             
             # Then try hardcoded path
-            f.write(f'if exist "{python_path}" (\n')
-            f.write(f'    echo Found Python at hardcoded path: {python_path}\n')
-            f.write(f'    set PYTHON_EXECUTABLE="{python_path}"\n')
-            f.write("    set PYTHON_FOUND=1\n")
-            f.write(")\n\n")
+            f.write(f'    if exist "{python_path}" (\n')
+            f.write(f'        echo Found Python at hardcoded path: {python_path}\n')
+            f.write(f'        set PYTHON_EXECUTABLE="{python_path}"\n')
+            f.write("        set PYTHON_FOUND=1\n")
+            f.write("    )\n\n")
             
             # Check common paths if Python still not found
-            f.write("if %PYTHON_FOUND% EQU 0 (\n")
-            f.write("    echo Checking additional Python paths...\n")
-            f.write("    set POTENTIAL_PATHS=python python3 py py.exe ")
+            f.write("    if %PYTHON_FOUND% EQU 0 (\n")
+            f.write("        echo Checking additional Python paths...\n")
+            f.write("        set POTENTIAL_PATHS=python python3 py py.exe ")
             
             # Add common Windows Python paths to check
             for version in ["38", "39", "310", "311", "312"]:
@@ -188,34 +198,32 @@ def package_application():
             f.write('"C:\\msys64\\mingw64\\bin\\python.exe" ')
             
             f.write("\n")
-            f.write("    for %%p in (%POTENTIAL_PATHS%) do (\n")
-            f.write("        echo Checking: %%p\n")
-            f.write("        %%p --version >nul 2>nul\n")
-            f.write("        if not ERRORLEVEL 1 (\n")
-            f.write("            echo Found working Python: %%p\n")
-            f.write("            set PYTHON_EXECUTABLE=%%p\n")
-            f.write("            set PYTHON_FOUND=1\n")
-            f.write("            goto python_found\n")
+            f.write("        for %%p in (%POTENTIAL_PATHS%) do (\n")
+            f.write("            echo Checking: %%p\n")
+            f.write("            %%p --version >nul 2>nul\n")
+            f.write("            if not ERRORLEVEL 1 (\n")
+            f.write("                echo Found working Python: %%p\n")
+            f.write("                set PYTHON_EXECUTABLE=%%p\n")
+            f.write("                set PYTHON_FOUND=1\n")
+            f.write("                goto python_found\n")
+            f.write("            )\n")
             f.write("        )\n")
             f.write("    )\n")
-            f.write(")\n")
-            f.write(":python_found\n\n")
+            f.write("    :python_found\n\n")
             
-            f.write("if %PYTHON_FOUND% EQU 0 (\n")
-            f.write("    echo ERROR: Could not find Python installation. Please install Python 3.8 or higher.\n")
-            f.write("    echo Press any key to exit...\n")
-            f.write("    pause >nul\n")
-            f.write("    exit /b 1\n")
+            f.write("    if %PYTHON_FOUND% EQU 0 (\n")
+            f.write("        echo ERROR: Could not find Python installation. Please install Python 3.8 or higher.\n")
+            f.write("        echo Press any key to exit...\n")
+            f.write("        pause >nul\n")
+            f.write("        exit /b 1\n")
+            f.write("    )\n\n")
+            
+            f.write("    echo Using Python: %PYTHON_EXECUTABLE%\n")
+            f.write("    echo Starting backend from: %BACKEND_DIR%\\run_backend.py\n")
+            f.write("    %PYTHON_EXECUTABLE% %BACKEND_DIR%\\run_backend.py\n")
             f.write(")\n\n")
             
-            f.write("echo Using Python: %PYTHON_EXECUTABLE%\n\n")
-            
-            # Find backend path
-            f.write("set BACKEND_DIR=%~dp0backend\n")
-            f.write("echo Starting backend from: %BACKEND_DIR%\\run_backend.py\n")
-            
-            # Start the application
-            f.write("%PYTHON_EXECUTABLE% %BACKEND_DIR%\\run_backend.py\n")
+            # Check for Ollama error code
             f.write("if ERRORLEVEL 78 (\n")
             f.write("    echo ERROR: Ollama is not running. Please start Ollama first.\n")
             f.write("    echo See OLLAMA_SETUP.txt for instructions.\n")
@@ -223,6 +231,8 @@ def package_application():
             f.write("    pause >nul\n")
             f.write("    exit /b 1\n")
             f.write(")\n")
+            
+            # Start the Electron app
             f.write('start "" "%~dp0SQL Sage.exe"\n')
         
         print(f"\n✅ Packaging complete! Your application is ready in: {final_package_path}")
@@ -241,4 +251,3 @@ def package_application():
                     shutil.rmtree(temp_dir)
                 except:
                     print(f"Warning: Could not clean up {temp_dir}")
-
