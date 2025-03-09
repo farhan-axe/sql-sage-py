@@ -1,10 +1,14 @@
 
+"""
+SQL Sage Packaging Script - Build and package the application for distribution.
+"""
+
 import os
 import sys
 import shutil
 import subprocess
 import platform
-from build_backend import build_backend
+from backend_utils import build_backend
 
 def find_npm():
     """Find the npm executable based on the platform."""
