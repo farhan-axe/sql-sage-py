@@ -165,8 +165,8 @@ def run_backend():
                 with open(bat_path, 'w') as f:
                     f.write("@echo off\\n")
                     f.write("echo Starting SQL Sage API with absolute path...\\n")
-                    # FIX: Use the python_exe variable which is assigned to HARDCODED_PYTHON_PATH
-                    f.write(f'"{python_exe}" "{api_routes_path}"\\n')
+                    # Make sure to use the variable from the generated script
+                    f.write(f'"{{python_exe}}" "{{api_routes_path}}"\\n')
                 print(f"Created batch file with absolute paths: {{bat_path}}")
                 # Use this as our command instead
                 cmd = bat_path
@@ -224,8 +224,8 @@ def run_backend():
                 with open(bat_path, 'w') as f:
                     f.write("@echo off\\n")
                     f.write("echo Starting SQL Sage API (sql.py) with absolute path...\\n")
-                    # FIX: Use the python_exe variable which is assigned to HARDCODED_PYTHON_PATH
-                    f.write(f'"{python_exe}" "{sql_path}"\\n')
+                    # Make sure to use the variable from the generated script
+                    f.write(f'"{{python_exe}}" "{{sql_path}}"\\n')
                 print(f"Created batch file with absolute paths: {{bat_path}}")
                 # Use this as our command instead
                 cmd = bat_path
@@ -288,4 +288,3 @@ if __name__ == "__main__":
     print(f"Created backend launcher script: {backend_launcher}")
     
     return backend_dir
-
