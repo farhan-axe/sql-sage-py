@@ -55,9 +55,9 @@ def detect_conda_environment():
     # Try specific known paths for the sqlbot environment
     if platform.system() == "Windows":
         known_paths = [
+            r"C:\Users\farha\anaconda3\envs\sqlbot\python.exe",  # User's specific path
             os.path.expanduser("~/anaconda3/envs/sqlbot/python.exe"),
             os.path.expanduser("~/miniconda3/envs/sqlbot/python.exe"),
-            "C:\\Users\\farha\\anaconda3\\envs\\sqlbot\\python.exe",  # Known path from user's environment
             "C:\\ProgramData\\Anaconda3\\envs\\sqlbot\\python.exe",
         ]
         
@@ -84,7 +84,7 @@ def detect_conda_environment():
 
 def find_python_executable():
     """Find a Python executable path that exists and can be used."""
-    # First, use the user's specific path if provided
+    # First, use the user's specific path if provided - this is the most reliable
     user_specific_path = r"C:\Users\farha\anaconda3\envs\sqlbot\python.exe"
     if os.path.exists(user_specific_path):
         print(f"Using user-specified Python path: {user_specific_path}")

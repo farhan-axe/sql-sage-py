@@ -57,9 +57,15 @@ def build_backend():
             f.write("# Default configuration\nMODEL=deepseek-r1:8b\nPORT=5000\n")
         print("Created .env file")
     
-    # Use find_python_executable which prioritizes the user's specific path
-    python_path = find_python_executable()
-    print(f"Selected Python executable for backend: {python_path}")
+    # First try the hardcoded Python path that we know works
+    hardcoded_python_path = r"C:\Users\farha\anaconda3\envs\sqlbot\python.exe"
+    if os.path.exists(hardcoded_python_path):
+        python_path = hardcoded_python_path
+        print(f"Using user-specified Python path: {python_path}")
+    else:
+        # Use find_python_executable which tries other detection methods
+        python_path = find_python_executable()
+        print(f"Selected Python executable for backend: {python_path}")
     
     # FIX: Normalize the path to use proper path separators for the OS
     if python_path:

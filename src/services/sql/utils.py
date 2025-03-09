@@ -67,13 +67,12 @@ def find_python_executable():
     # Try checking for specific conda environment paths
     if platform.system() == "Windows":
         potential_conda_paths = [
+            r"C:\Users\farha\anaconda3\envs\sqlbot\python.exe",  # User's specific path
             os.path.expanduser("~/miniconda3/envs/sqlbot/python.exe"),
             os.path.expanduser("~/anaconda3/envs/sqlbot/python.exe"),
             os.path.expanduser("~/AppData/Local/miniconda3/envs/sqlbot/python.exe"),
             os.path.expanduser("~/AppData/Local/Continuum/miniconda3/envs/sqlbot/python.exe"),
             os.path.expanduser("~/AppData/Local/anaconda3/envs/sqlbot/python.exe"),
-            # Add more potential paths for Windows
-            "C:\\Users\\farha\\anaconda3\\envs\\sqlbot\\python.exe",  # Known path from user's environment
             "C:\\ProgramData\\Anaconda3\\envs\\sqlbot\\python.exe",
             "C:\\ProgramData\\miniconda3\\envs\\sqlbot\\python.exe",
         ]

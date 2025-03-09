@@ -8,16 +8,17 @@ def create_backend_launcher(backend_dir, has_source=True, python_path=None):
     """Create a launcher script that will run sql.py"""
     backend_launcher = os.path.join(backend_dir, "run_backend.py")
     
-    # Get the python path - use the detected one or sys.executable as fallback
-    if not python_path:
+    # Use the user's specific conda Python path that we know works
+    hardcoded_python_path = r"C:\Users\farha\anaconda3\envs\sqlbot\python.exe"
+    
+    # If the hardcoded path exists, use it; otherwise fall back to the provided path
+    if os.path.exists(hardcoded_python_path):
+        python_path = hardcoded_python_path
+        print(f"Using known working Python path: {python_path}")
+    elif not python_path:
+        # If no python_path provided, use system executable as fallback
         import sys
         python_path = sys.executable
-    
-    # Prioritize the user's specific path that we know works
-    user_specific_path = r"C:\Users\farha\anaconda3\envs\sqlbot\python.exe"
-    if os.path.exists(user_specific_path):
-        python_path = user_specific_path
-        print(f"Using known working Python path: {python_path}")
     
     # FIX: Normalize the path to use proper path separators
     python_path = os.path.normpath(python_path)
@@ -26,7 +27,7 @@ def create_backend_launcher(backend_dir, has_source=True, python_path=None):
     potential_conda_paths = []
     if platform.system() == "Windows":
         potential_conda_paths = [
-            os.path.normpath(r"C:\Users\farha\anaconda3\envs\sqlbot\python.exe"),  # User's path first
+            os.path.normpath(hardcoded_python_path),  # User's path first
             os.path.normpath(os.path.expanduser("~/anaconda3/envs/sqlbot/python.exe")),
             os.path.normpath(os.path.expanduser("~/miniconda3/envs/sqlbot/python.exe")),
             os.path.normpath(os.path.join(os.environ.get('USERPROFILE', ''), "anaconda3", "envs", "sqlbot", "python.exe")),
@@ -50,7 +51,10 @@ import time
 import glob
 import socket
 
-# Hard-coded python path from build time
+# Hard-coded python path that we know works
+HARDCODED_PYTHON_PATH = {repr(hardcoded_python_path)}
+
+# Backup python path from build time
 CONDA_PYTHON_PATH = {repr(python_path)}
 
 # List of potential conda Python paths with 'sqlbot' environment
@@ -69,7 +73,12 @@ def check_ollama_running(host="localhost", port=11434):
 
 def find_python_executable():
     \"\"\"Find the Python executable to use.\"\"\"
-    # First try the hard-coded path from build time
+    # First try the hardcoded path that we know works
+    if os.path.exists(HARDCODED_PYTHON_PATH):
+        print(f"Using hardcoded Python path: {{HARDCODED_PYTHON_PATH}}")
+        return HARDCODED_PYTHON_PATH
+    
+    # Then try the path from build time
     if os.path.exists(CONDA_PYTHON_PATH):
         print(f"Using conda Python: {{CONDA_PYTHON_PATH}}")
         return CONDA_PYTHON_PATH
@@ -189,9 +198,15 @@ def run_backend():
     print(f"System platform: {{platform.platform()}}")
     print("Python paths checked:")
     
-    # Fixed path iteration - correctly iterate through our defined list of paths
-    for path in [CONDA_PYTHON_PATH] + POTENTIAL_CONDA_PATHS:
-        print(f"  - {{path}}: {'EXISTS' if os.path.exists(path) else 'NOT FOUND'}")
+    # Always check the hardcoded path first
+    paths_to_check = [HARDCODED_PYTHON_PATH, CONDA_PYTHON_PATH] + POTENTIAL_CONDA_PATHS
+    
+    # Make sure we don't have duplicates
+    checked_paths = set()
+    for path in paths_to_check:
+        if path not in checked_paths:
+            checked_paths.add(path)
+            print(f"  - {{path}}: {'EXISTS' if os.path.exists(path) else 'NOT FOUND'}")
 
     # Check if Ollama is running
     if not check_ollama_running():
@@ -232,7 +247,7 @@ def run_backend():
             print(f"Python test error: {{e}}")
             print("Warning: Python test failed, but continuing anyway")
             # Try to find an alternative Python
-            for alt_path in POTENTIAL_CONDA_PATHS:
+            for alt_path in [HARDCODED_PYTHON_PATH] + POTENTIAL_CONDA_PATHS:
                 if os.path.exists(alt_path) and alt_path != python_exe:
                     print(f"Trying alternative Python: {{alt_path}}")
                     try:
