@@ -111,16 +111,16 @@ def detect_conda_environment():
                         print(f"Found sqlbot conda environment at: {env_path}")
                         print(f"Using Python executable: {python_path}")
                         return python_path
-    except:
-        print("Failed to detect conda environments via conda command")
+    except Exception as e:
+        print(f"Failed to detect conda environments via conda command: {e}")
     
     # Try specific known paths for the sqlbot environment
     if platform.system() == "Windows":
         known_paths = [
             os.path.expanduser("~/anaconda3/envs/sqlbot/python.exe"),
             os.path.expanduser("~/miniconda3/envs/sqlbot/python.exe"),
-            "C:\\\\Users\\\\farha\\\\anaconda3\\\\envs\\\\sqlbot\\\\python.exe",  # Known path from user's environment
-            "C:\\\\ProgramData\\Anaconda3\\envs\\sqlbot\\python.exe",
+            "C:\\Users\\farha\\anaconda3\\envs\\sqlbot\\python.exe",  # Known path from user's environment
+            "C:\\ProgramData\\Anaconda3\\envs\\sqlbot\\python.exe",
         ]
         
         for path in known_paths:
@@ -128,7 +128,19 @@ def detect_conda_environment():
                 print(f"Found sqlbot environment Python at: {path}")
                 return path
     
-    # If we're not in a conda environment or couldn't find the python executable
+    # Detect via system PATH
+    try:
+        # Try to find python in PATH
+        python_cmd = "python" if platform.system() == "Windows" else "python3"
+        path_result = subprocess.run([python_cmd, "--version"], 
+                               capture_output=True, text=True)
+        if path_result.returncode == 0:
+            print(f"Found system Python: {python_cmd}")
+            return python_cmd
+    except Exception as e:
+        print(f"Failed to detect Python in PATH: {e}")
+    
+    # Last resort: use sys.executable
     print(f"Using system Python: {sys.executable}")
     return sys.executable
 
@@ -201,8 +213,8 @@ def create_backend_launcher(backend_dir, has_source=True, python_path=None):
     if not python_path:
         python_path = sys.executable
     
-    # We'll write the launcher content in smaller chunks to avoid string formatting issues
-    launcher_content = """
+    # Content of the launcher script
+    launcher_content = f"""
 import os
 import sys
 import subprocess
@@ -212,7 +224,7 @@ import glob
 import socket
 
 # Hard-coded python path from build time
-CONDA_PYTHON_PATH = """ + repr(python_path) + """
+CONDA_PYTHON_PATH = {repr(python_path)}
 
 # List of potential conda Python paths with 'sqlbot' environment
 POTENTIAL_CONDA_PATHS = [
@@ -229,10 +241,7 @@ POTENTIAL_CONDA_PATHS = [
 ]
 
 def check_ollama_running(host="localhost", port=11434):
-"""
-    
-    # Add the docstring for check_ollama_running as a separate string to avoid formatting issues
-    launcher_content += """    \"\"\"Check if Ollama server is running by attempting to connect to its port.\"\"\"
+    \"\"\"Check if Ollama server is running by attempting to connect to its port.\"\"\"
     try:
         # Try to create a socket connection to the Ollama server
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -243,13 +252,10 @@ def check_ollama_running(host="localhost", port=11434):
         return False  # Any exception means Ollama is not accessible
 
 def find_python_executable():
-"""
-
-    # Add the docstring for find_python_executable as a separate string
-    launcher_content += """    \"\"\"Find the Python executable to use.\"\"\"
+    \"\"\"Find the Python executable to use.\"\"\"
     # First try the hard-coded path from build time
     if os.path.exists(CONDA_PYTHON_PATH):
-        print(f"Using conda Python: {CONDA_PYTHON_PATH}")
+        print(f"Using conda Python: {{CONDA_PYTHON_PATH}}")
         return CONDA_PYTHON_PATH
     
     # Check if we're running in a conda environment
@@ -261,12 +267,9 @@ def find_python_executable():
             conda_python = os.path.join(conda_prefix, "bin", "python")
         
         if os.path.exists(conda_python):
-            print(f"Found conda Python: {conda_python}")
+            print(f"Found conda Python: {{conda_python}}")
             return conda_python
-"""
-
-    # Continue with the rest of the launcher content
-    launcher_content += """            
+    
     # Try to get conda environments
     try:
         # Try to detect conda environments using conda command
@@ -278,7 +281,7 @@ def find_python_executable():
                     env_path = line.split()[-1]  # Path is usually the last item
                     python_path = os.path.join(env_path, "python.exe" if platform.system() == "Windows" else "bin/python")
                     if os.path.exists(python_path):
-                        print(f"Found conda Python from env list: {python_path}")
+                        print(f"Found conda Python from env list: {{python_path}}")
                         return python_path
     except:
         print("Failed to get conda environments via command")
@@ -286,8 +289,24 @@ def find_python_executable():
     # Check our potential conda paths
     for path in POTENTIAL_CONDA_PATHS:
         if os.path.exists(path):
-            print(f"Found Python at preset location: {path}")
+            print(f"Found Python at preset location: {{path}}")
             return path
+    
+    # Check system PATH python locations
+    python_cmds = ["python", "python3"]
+    if platform.system() == "Windows":
+        python_cmds = ["python.exe", "py"]
+    
+    for cmd in python_cmds:
+        try:
+            result = subprocess.run([cmd, "--version"], 
+                                  capture_output=True, 
+                                  text=True)
+            if result.returncode == 0:
+                print(f"Found Python in PATH: {{cmd}}")
+                return cmd
+        except FileNotFoundError:
+            continue
     
     # Check common locations for Python
     if platform.system() == "Windows":
@@ -314,7 +333,7 @@ def find_python_executable():
     
     for path in common_paths:
         if os.path.exists(path):
-            print(f"Found Python at common location: {path}")
+            print(f"Found Python at common location: {{path}}")
             return path
             
     # Look for Python in Program Files and other common locations
@@ -331,29 +350,14 @@ def find_python_executable():
             if matches:
                 # Sort to get the latest version
                 matches.sort(reverse=True)
-                print(f"Found Python via glob: {matches[0]}")
+                print(f"Found Python via glob: {{matches[0]}}")
                 return matches[0]
     
     # As a last resort, try to use the python command directly
-    try:
-        # Check if 'python' or 'python3' exists in PATH
-        cmd = "python" if platform.system() == "Windows" else "python3"
-        result = subprocess.run([cmd, "--version"], capture_output=True, text=True)
-        if result.returncode == 0:
-            print(f"Using system Python: {cmd}")
-            return cmd
-    except:
-        pass
-        
-    # Absolute last resort
-    print("Using system Python as fallback")
     return "python" if platform.system() == "Windows" else "python3"
 
 def run_backend():
-"""
-
-    # Add the rest of the run_backend function
-    launcher_content += """    \"\"\"Run the backend server using the found Python executable.\"\"\"
+    \"\"\"Run the backend server using the found Python executable.\"\"\"
     # Get the directory where this script is located
     script_dir = os.path.dirname(os.path.abspath(__file__))
     
@@ -365,11 +369,11 @@ def run_backend():
     os.chdir(script_dir)
     
     # Print diagnostic information
-    print(f"Working directory: {os.getcwd()}")
-    print(f"System platform: {platform.platform()}")
+    print(f"Working directory: {{os.getcwd()}}")
+    print(f"System platform: {{platform.platform()}}")
     print(f"Python paths checked:")
     for path in [CONDA_PYTHON_PATH] + POTENTIAL_CONDA_PATHS:
-        print(f"  - {path}: {'EXISTS' if os.path.exists(path) else 'NOT FOUND'}")
+        print(f"  - {{path}}: {'EXISTS' if os.path.exists(path) else 'NOT FOUND'}")
     
     # Check if Ollama is running
     if not check_ollama_running():
@@ -390,33 +394,33 @@ def run_backend():
     
     # Find the python executable
     python_exe = find_python_executable()
-    print(f"Using Python executable: {python_exe}")
+    print(f"Using Python executable: {{python_exe}}")
     
     # Create a simple test to validate Python works
     test_script = os.path.join(script_dir, "test_python.py")
     with open(test_script, 'w') as f:
-        f.write("print('Python test successful!')\\n")
+        f.write("print('Python test successful!')")
     
     try:
         # Test if Python is working
         print("Testing Python executable...")
         try:
             result = subprocess.run([python_exe, test_script], capture_output=True, text=True, timeout=5)
-            print(f"Python test output: {result.stdout}")
+            print(f"Python test output: {{result.stdout}}")
             if result.returncode != 0:
-                print(f"Python test error: {result.stderr}")
+                print(f"Python test error: {{result.stderr}}")
                 print("Warning: Python test failed, but continuing anyway")
         except Exception as e:
-            print(f"Python test error: {e}")
+            print(f"Python test error: {{e}}")
             print("Warning: Python test failed, but continuing anyway")
             # Try to find an alternative Python
             for alt_path in POTENTIAL_CONDA_PATHS:
                 if os.path.exists(alt_path) and alt_path != python_exe:
-                    print(f"Trying alternative Python: {alt_path}")
+                    print(f"Trying alternative Python: {{alt_path}}")
                     try:
                         result = subprocess.run([alt_path, test_script], capture_output=True, text=True, timeout=5)
                         if result.returncode == 0:
-                            print(f"Alternative Python works! Using: {alt_path}")
+                            print(f"Alternative Python works! Using: {{alt_path}}")
                             python_exe = alt_path
                             break
                     except:
@@ -430,7 +434,7 @@ def run_backend():
             print(output)
             packages_installed = True
         except subprocess.CalledProcessError as e:
-            print(f"Error checking packages: {e.output}")
+            print(f"Error checking packages: {{e.output}}")
             packages_installed = False
         
         if not packages_installed:
@@ -438,7 +442,7 @@ def run_backend():
             # Check if requirements.txt exists
             req_file = os.path.join(script_dir, "requirements.txt")
             if os.path.exists(req_file):
-                print(f"Installing packages from {req_file}")
+                print(f"Installing packages from {{req_file}}")
                 subprocess.check_call([python_exe, "-m", "pip", "install", "-r", req_file])
             else:
                 # Install minimum required packages
@@ -448,17 +452,44 @@ def run_backend():
         # Check if api_routes.py exists
         api_routes_path = os.path.join(script_dir, "api_routes.py")
         if os.path.exists(api_routes_path):
-            print(f"Starting backend using {api_routes_path}")
+            print(f"Starting backend using {{api_routes_path}}")
             
             # On Windows, use the appropriate method to hide the console window
+            # but don't do this for debugging as we want to see output
             startup_info = None
             if platform.system() == "Windows":
                 startup_info = subprocess.STARTUPINFO()
                 startup_info.dwFlags |= subprocess.STARTF_USESHOWWINDOW
                 startup_info.wShowWindow = 0  # SW_HIDE
             
+            # Use shell=True on Windows to make sure the python command is found
+            use_shell = platform.system() == "Windows"
+            
+            # Build command with full paths to be safer
+            if os.path.isabs(python_exe):
+                cmd = [python_exe, api_routes_path]
+            else:
+                # For Python commands like "python" or "python3" 
+                # Use shell=True to let the system find them
+                cmd = f"{{python_exe}} {{api_routes_path}}" if use_shell else [python_exe, api_routes_path]
+            
+            print(f"Executing command: {{cmd}}")
+            
+            # Create a .bat file on Windows as an alternative method
+            if platform.system() == "Windows" and not os.path.isabs(python_exe):
+                bat_path = os.path.join(script_dir, "run_api.bat")
+                with open(bat_path, 'w') as f:
+                    f.write(f"@echo off\\n")
+                    f.write(f"echo Starting SQL Sage API...\\n")
+                    f.write(f"{{python_exe}} {{api_routes_path}}\\n")
+                print(f"Created batch file: {{bat_path}}")
+                cmd = bat_path
+                use_shell = True
+            
+            # Start the process
             process = subprocess.Popen(
-                [python_exe, api_routes_path],
+                cmd,
+                shell=use_shell,
                 startupinfo=startup_info,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -470,13 +501,13 @@ def run_backend():
             if process.poll() is not None:
                 # Process has already terminated
                 stdout, stderr = process.communicate()
-                print(f"Backend process failed to start. Return code: {process.returncode}")
-                print(f"stdout: {stdout}")
-                print(f"stderr: {stderr}")
+                print(f"Backend process failed to start. Return code: {{process.returncode}}")
+                print(f"stdout: {{stdout}}")
+                print(f"stderr: {{stderr}}")
                 
                 # Write an error file that the main app can detect
                 with open(os.path.join(script_dir, "backend_start_failed.err"), "w") as f:
-                    f.write(f"Backend process failed to start\\n\\nDetails:\\n{stderr}")
+                    f.write(f"Backend process failed to start\\n\\nDetails:\\n{{stderr}}")
                 
                 sys.exit(1)
             else:
@@ -486,17 +517,38 @@ def run_backend():
         # Check if sql.py exists as fallback
         sql_path = os.path.join(script_dir, "sql.py")
         if os.path.exists(sql_path):
-            print(f"Starting backend using {sql_path}")
+            print(f"Starting backend using {{sql_path}}")
             
-            # On Windows, use the appropriate method to hide the console window
+            # Similar approach as above, just with sql.py
             startup_info = None
             if platform.system() == "Windows":
                 startup_info = subprocess.STARTUPINFO()
                 startup_info.dwFlags |= subprocess.STARTF_USESHOWWINDOW
                 startup_info.wShowWindow = 0  # SW_HIDE
             
+            # Use shell=True on Windows
+            use_shell = platform.system() == "Windows"
+            
+            # Build command
+            if os.path.isabs(python_exe):
+                cmd = [python_exe, sql_path]
+            else:
+                cmd = f"{{python_exe}} {{sql_path}}" if use_shell else [python_exe, sql_path]
+            
+            # Create a .bat file on Windows
+            if platform.system() == "Windows" and not os.path.isabs(python_exe):
+                bat_path = os.path.join(script_dir, "run_sql.bat")
+                with open(bat_path, 'w') as f:
+                    f.write(f"@echo off\\n")
+                    f.write(f"echo Starting SQL Sage API (sql.py)...\\n")
+                    f.write(f"{{python_exe}} {{sql_path}}\\n")
+                print(f"Created batch file: {{bat_path}}")
+                cmd = bat_path
+                use_shell = True
+            
             process = subprocess.Popen(
-                [python_exe, sql_path],
+                cmd,
+                shell=use_shell,
                 startupinfo=startup_info,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -508,13 +560,13 @@ def run_backend():
             if process.poll() is not None:
                 # Process has already terminated
                 stdout, stderr = process.communicate()
-                print(f"Backend process failed to start. Return code: {process.returncode}")
-                print(f"stdout: {stdout}")
-                print(f"stderr: {stderr}")
+                print(f"Backend process failed to start. Return code: {{process.returncode}}")
+                print(f"stdout: {{stdout}}")
+                print(f"stderr: {{stderr}}")
                 
                 # Write an error file that the main app can detect
                 with open(os.path.join(script_dir, "backend_start_failed.err"), "w") as f:
-                    f.write(f"Backend process failed to start\\n\\nDetails:\\n{stderr}")
+                    f.write(f"Backend process failed to start\\n\\nDetails:\\n{{stderr}}")
                 
                 sys.exit(1)
             else:
@@ -530,13 +582,13 @@ def run_backend():
         sys.exit(1)
         
     except Exception as e:
-        print(f"Error starting backend: {e}")
+        print(f"Error starting backend: {{e}}")
         import traceback
         traceback.print_exc()
         
         # Write an error file that the main app can detect
         with open(os.path.join(script_dir, "backend_error.err"), "w") as f:
-            f.write(f"Error starting backend: {e}\\n\\n{traceback.format_exc()}")
+            f.write(f"Error starting backend: {{e}}\\n\\n{{traceback.format_exc()}}")
         
         sys.exit(1)
 

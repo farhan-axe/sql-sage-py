@@ -5,18 +5,22 @@ This application requires Ollama to be installed and running with DeepSeek R1 mo
 
 ## Prerequisites
 
-1. Install Ollama from [ollama.ai](https://ollama.ai)
-2. Pull the DeepSeek R1 model:
+1. **Python Requirements**
+   - A working Python installation (Python 3.8 or higher)
+   - On Windows, make sure Python is added to your PATH
+   - If using conda, make sure you have activated your environment
 
-```bash
-ollama pull deepseek-r1:8b
-```
+2. **Ollama Setup**
+   - Install Ollama from [ollama.ai](https://ollama.ai)
+   - Pull the DeepSeek R1 model:
 
-Alternatively, you can pull a larger model for better performance:
+   ```bash
+   # Pull the base 8B model (faster, less resources needed)
+   ollama pull deepseek-r1:8b
 
-```bash
-ollama pull deepseek-r1:14b
-```
+   # OR pull the larger model for better performance
+   ollama pull deepseek-r1:14b
+   ```
 
 ## Configuration
 
@@ -33,14 +37,14 @@ You can customize the model used by:
 
 ### Development Mode
 
-1. Install Python dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-2. Start Ollama:
+1. Start Ollama first:
    ```bash
    ollama serve
+   ```
+
+2. Install Python dependencies:
+   ```bash
+   pip install -r requirements.txt
    ```
 
 3. Start the backend:
@@ -55,14 +59,32 @@ You can customize the model used by:
 
 ### Using Executables
 
-1. Start Ollama (must be running before launching the application)
+1. Make sure Python is properly installed on your system
+   - Test with `python --version` or `python3 --version`
+   - If using Windows, ensure Python is in your PATH environment variable
+
+2. Start Ollama (must be running before launching the application)
    ```bash
    ollama serve
    ```
 
-2. Run the SQL Sage application
+3. Run the SQL Sage application
 
 ## Troubleshooting
+
+### Python Issues
+
+- If you see "Failed to start the SQL Sage backend: spawn python ENOENT" or similar:
+  - Make sure Python is installed and in your PATH
+  - Try running `python --version` in a terminal to verify it works
+  - On Windows, you may need to reinstall Python and check "Add Python to PATH" during installation
+
+- If packages are missing, manually install them:
+  ```bash
+  pip install fastapi uvicorn pyodbc requests python-dotenv
+  ```
+
+### Ollama Issues
 
 - If you encounter errors with Ollama, ensure that the Ollama service is running:
   ```bash
@@ -75,8 +97,11 @@ You can customize the model used by:
   - deepseek-r1:8b (smaller, faster)
   - deepseek-r1:14b (larger, more accurate)
 
-- If the application shows an error about Python or the backend process, make sure Python is installed
-  and that your environment has the required packages (fastapi, uvicorn, etc.).
+### General Troubleshooting
+
+- Check for error logs in the backend directory
+- Restart both Ollama and the SQL Sage application
+- If all else fails, try restarting your computer
 
 ## Important Notes
 
