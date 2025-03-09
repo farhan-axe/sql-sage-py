@@ -70,6 +70,27 @@ You can customize the model used by:
 
 3. Run the SQL Sage application
 
+## Important for Conda Users
+
+If you're using a conda environment:
+
+1. **For running the application**: The application should detect and use your conda environment automatically if it exists.
+
+2. **For packaging the application**: You should deactivate your conda environment before running the packaging script:
+   ```bash
+   conda deactivate
+   python package_app.py
+   ```
+
+3. If you still encounter "spawn python ENOENT" errors:
+   - Make sure a system-wide Python installation is available and in your PATH
+   - The application looks for Python in these locations (in order):
+     1. The path specified during packaging
+     2. The current conda environment 
+     3. The 'sqlbot' conda environment
+     4. System-wide Python installation
+     5. Common Python installation paths
+
 ## Troubleshooting
 
 ### Python Issues
@@ -91,6 +112,12 @@ You can customize the model used by:
   ```bash
   pip install fastapi uvicorn pyodbc requests python-dotenv
   ```
+
+### Path Format Issues
+
+- On Windows, make sure paths use consistent separators. The application will try to normalize paths, but if you encounter issues, check that:
+  - Paths use either all backslashes (`\`) or forward slashes (`/`)
+  - When editing paths manually, use double backslashes (`\\`) in configuration files
 
 ### Ollama Issues
 
