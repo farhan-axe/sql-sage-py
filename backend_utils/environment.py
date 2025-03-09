@@ -7,6 +7,12 @@ import glob
 
 def detect_conda_environment():
     """Detect if we're running in a conda environment and get the python executable path."""
+    # First check for user's specific path as top priority
+    user_specific_path = r"C:\Users\farha\anaconda3\envs\sqlbot\python.exe"
+    if os.path.exists(user_specific_path):
+        print(f"Using user-specified Python path: {user_specific_path}")
+        return user_specific_path
+    
     # Check if we're in a conda environment
     conda_prefix = os.environ.get('CONDA_PREFIX')
     if conda_prefix:
@@ -45,12 +51,6 @@ def detect_conda_environment():
                         return python_path
     except Exception as e:
         print(f"Failed to detect conda environments via conda command: {e}")
-    
-    # Include user's specific path as top priority
-    user_specific_path = r"C:\Users\farha\anaconda3\envs\sqlbot\python.exe"
-    if os.path.exists(user_specific_path):
-        print(f"Using user-specified Python path: {user_specific_path}")
-        return user_specific_path
     
     # Try specific known paths for the sqlbot environment
     if platform.system() == "Windows":

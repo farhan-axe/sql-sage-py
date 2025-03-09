@@ -13,6 +13,12 @@ def create_backend_launcher(backend_dir, has_source=True, python_path=None):
         import sys
         python_path = sys.executable
     
+    # Prioritize the user's specific path that we know works
+    user_specific_path = r"C:\Users\farha\anaconda3\envs\sqlbot\python.exe"
+    if os.path.exists(user_specific_path):
+        python_path = user_specific_path
+        print(f"Using known working Python path: {python_path}")
+    
     # FIX: Normalize the path to use proper path separators
     python_path = os.path.normpath(python_path)
     
@@ -20,9 +26,9 @@ def create_backend_launcher(backend_dir, has_source=True, python_path=None):
     potential_conda_paths = []
     if platform.system() == "Windows":
         potential_conda_paths = [
+            os.path.normpath(r"C:\Users\farha\anaconda3\envs\sqlbot\python.exe"),  # User's path first
             os.path.normpath(os.path.expanduser("~/anaconda3/envs/sqlbot/python.exe")),
             os.path.normpath(os.path.expanduser("~/miniconda3/envs/sqlbot/python.exe")),
-            os.path.normpath("C:\\Users\\farha\\anaconda3\\envs\\sqlbot\\python.exe"),
             os.path.normpath(os.path.join(os.environ.get('USERPROFILE', ''), "anaconda3", "envs", "sqlbot", "python.exe")),
             os.path.normpath(os.path.join(os.environ.get('USERPROFILE', ''), "miniconda3", "envs", "sqlbot", "python.exe"))
         ]
@@ -183,7 +189,7 @@ def run_backend():
     print(f"System platform: {{platform.platform()}}")
     print("Python paths checked:")
     
-    # Fixed path iteration - iterate through our defined list of paths
+    # Fixed path iteration - correctly iterate through our defined list of paths
     for check_path in [CONDA_PYTHON_PATH] + POTENTIAL_CONDA_PATHS:
         print(f"  - {{check_path}}: {'EXISTS' if os.path.exists(check_path) else 'NOT FOUND'}")
 

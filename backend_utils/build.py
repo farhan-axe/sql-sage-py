@@ -2,7 +2,7 @@
 import os
 import shutil
 from .path_finder import find_backend_directory
-from .environment import detect_conda_environment
+from .environment import detect_conda_environment, find_python_executable
 from .launcher import create_backend_launcher
 
 def build_backend():
@@ -57,8 +57,9 @@ def build_backend():
             f.write("# Default configuration\nMODEL=deepseek-r1:8b\nPORT=5000\n")
         print("Created .env file")
     
-    # Detect conda environment python path
-    python_path = detect_conda_environment()
+    # Use find_python_executable which prioritizes the user's specific path
+    python_path = find_python_executable()
+    print(f"Selected Python executable for backend: {python_path}")
     
     # FIX: Normalize the path to use proper path separators for the OS
     if python_path:
