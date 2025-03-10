@@ -32,5 +32,9 @@ export default defineConfig(({ mode }) => ({
   build: {
     outDir: "dist",
     emptyOutDir: true,
+    // Set base to ./ for proper asset loading in Electron
+    base: "./",
+    // Ensure that sourcemaps are generated
+    sourcemap: true,
   }
 }));

@@ -54,7 +54,10 @@ export function isNonSqlResponse(text: string): boolean {
     "democrat",
     "republican",
     "liberal",
-    "conservative"
+    "conservative",
+    "fuck",
+    "Fuck",
+    "prime minister"
   ];
   
   return nonDatabasePhrases.some(phrase => lowerText.includes(phrase));

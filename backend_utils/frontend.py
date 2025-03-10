@@ -43,7 +43,11 @@ def build_frontend():
     # Build the React app using Vite
     try:
         print("Building frontend with 'npm run build'...")
-        subprocess.check_call([npm_cmd, "run", "build"])
+        # Use --base=./ flag for proper asset paths in Electron
+        env = os.environ.copy()
+        env["VITE_BASE_URL"] = "./"
+        
+        subprocess.check_call([npm_cmd, "run", "build"], env=env)
         print("Frontend build complete!")
         return os.path.join(os.getcwd(), "dist")
     except subprocess.CalledProcessError as e:

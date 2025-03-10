@@ -1,4 +1,3 @@
-
 """
 Main functionality for packaging the SQL Sage application.
 """

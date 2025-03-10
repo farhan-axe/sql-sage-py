@@ -80,6 +80,10 @@ def build_electron_app():
     try:
         subprocess.check_call([npm_cmd, "install", "--save-dev", "electron", "electron-builder"])
         
+        # Make sure to build the frontend first for Electron
+        print("Building frontend with 'npm run build'...")
+        subprocess.check_call([npm_cmd, "run", "build"])
+        
         # Build Electron app with --dir option (to create unpacked version)
         npx_cmd = "npx.cmd" if platform.system() == "Windows" else "npx"
         
