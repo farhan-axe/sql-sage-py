@@ -69,26 +69,55 @@ const Index = () => {
         console.log("Loaded saved queries from localStorage:", savedQueries.length);
         
         if (savedQueries.length > 0) {
-          let formattedExamples = '';
+          // Create a copy of the original examples to ensure we don't duplicate
+          let formattedExamples = info.queryExamples ? info.queryExamples : '';
           
-          if (info.queryExamples && !info.queryExamples.includes("provide me list of products, sales territory")) {
-            formattedExamples = formatQueryExamples(info.queryExamples, info.connectionConfig.database);
+          // Skip examples formatting if it includes our test case to avoid duplication
+          if (!formattedExamples.includes("provide me list of products, sales territory")) {
+            formattedExamples = formatQueryExamples(formattedExamples, info.connectionConfig.database);
           }
           
-          const startingExampleIndex = formattedExamples.split('\n\n').filter(e => e.trim()).length + 1;
+          // Calculate the starting example number
+          const existingExamples = formattedExamples.split('\n\n').filter(e => e.trim());
+          const startingExampleIndex = existingExamples.length > 0 ? 
+            existingExamples.length + 1 : 1;
           
+          // Parse existing examples to avoid duplicates
+          const existingQuestionsSet = new Set();
+          existingExamples.forEach(example => {
+            // Extract question from the example
+            const questionMatch = example.match(/^\d+\.\s+(.*?)\?,/);
+            if (questionMatch && questionMatch[1]) {
+              existingQuestionsSet.add(questionMatch[1].toLowerCase().trim());
+            }
+          });
+          
+          // Add saved queries if they don't already exist in the examples
           savedQueries.forEach((savedQuery: any, index: number) => {
+            // Skip if this question already exists
+            if (existingQuestionsSet.has(savedQuery.question.toLowerCase().trim())) {
+              console.log(`Skipping duplicate question: ${savedQuery.question}`);
+              return;
+            }
+            
             const formattedQuery = formatQueryExamples(savedQuery.query, info.connectionConfig.database);
             
             const exampleNumber = startingExampleIndex + index;
             const exampleText = `\n\n${exampleNumber}. ${savedQuery.question}?,\nYour SQL Query will be like "${formattedQuery}"\n`;
             formattedExamples += exampleText;
+            
+            // Add to set to avoid future duplicates
+            existingQuestionsSet.add(savedQuery.question.toLowerCase().trim());
           });
           
-          setDatabaseInfo({
-            ...info,
-            queryExamples: formattedExamples
-          });
+          // Update examples only if there were changes
+          if (formattedExamples !== info.queryExamples) {
+            console.log("Updated examples with saved queries");
+            setDatabaseInfo({
+              ...info,
+              queryExamples: formattedExamples
+            });
+          }
         }
       }
     } catch (error) {
@@ -113,7 +142,7 @@ const Index = () => {
       
       // Check if this query already exists
       const queryExists = savedQueries.some((q: any) => 
-        q.question === question && q.query === query
+        q.question.toLowerCase().trim() === question.toLowerCase().trim()
       );
       
       if (!queryExists) {
@@ -130,22 +159,36 @@ const Index = () => {
     // Update the examples in databaseInfo
     const dbName = databaseInfo.connectionConfig.database;
     
-    const tableRegex = /\b(FROM|JOIN)\s+(?!\[?[\w]+\]?\.\[?[\w]+\]?\.\[?)([\w\[\]]+)/gi;
+    // Format the query to include database prefix
+    const formattedQuery = formatQueryWithDatabasePrefix(query, dbName);
     
-    const formattedQuery = query.replace(tableRegex, (match, clause, tableName) => {
-      const cleanTableName = tableName.replace(/\[|\]/g, '');
-      return `${clause} [${dbName}].[dbo].[${cleanTableName}]`;
+    // Check if this question already exists in the examples
+    const existingExamples = databaseInfo.queryExamples.split('\n\n').filter(e => e.trim());
+    const questionExists = existingExamples.some(example => {
+      const questionMatch = example.match(/^\d+\.\s+(.*?)\?,/);
+      return questionMatch && 
+        questionMatch[1].toLowerCase().trim() === question.toLowerCase().trim();
     });
     
-    const newExample = `\n\n${databaseInfo.queryExamples.length > 0 ? '' : 'Below are some examples of questions:\n\n'}${databaseInfo.queryExamples.includes('1.') ? (
-      `${databaseInfo.queryExamples.split('\n\n').filter(e => e.trim()).length + 1}. ${question}?,\nYour SQL Query will be like "${formattedQuery}"\n`
-    ) : (
-      `1. ${question}?,\nYour SQL Query will be like "${formattedQuery}"\n`
-    )}`;
+    if (questionExists) {
+      console.log("Question already exists in examples, not adding duplicate");
+      toast({
+        title: "Query already saved",
+        description: "This query is already in your examples",
+      });
+      return;
+    }
     
+    // Determine the next example number
+    const nextExampleNumber = existingExamples.length > 0 ? existingExamples.length + 1 : 1;
+    
+    // Create the new example
+    const newExample = `\n\n${nextExampleNumber}. ${question}?,\nYour SQL Query will be like "${formattedQuery}"\n`;
+    
+    // Add header if this is the first example
     const updatedExamples = databaseInfo.queryExamples 
       ? `${databaseInfo.queryExamples}${newExample}` 
-      : newExample;
+      : `Below are some examples of questions:${newExample}`;
     
     setDatabaseInfo({
       ...databaseInfo,
@@ -158,6 +201,18 @@ const Index = () => {
     toast({
       title: "Query saved successfully",
       description: "The query has been added to your examples",
+    });
+  };
+
+  // Helper function to format query with database prefix
+  const formatQueryWithDatabasePrefix = (query: string, dbName: string): string => {
+    if (!query || !dbName) return query;
+    
+    const tableRegex = /\b(FROM|JOIN)\s+(?!\[?[\w]+\]?\.\[?[\w]+\]?\.\[?)([\w\[\]]+)/gi;
+    
+    return query.replace(tableRegex, (match, clause, tableName) => {
+      const cleanTableName = tableName.replace(/\[|\]/g, '');
+      return `${clause} [${dbName}].[dbo].[${cleanTableName}]`;
     });
   };
 

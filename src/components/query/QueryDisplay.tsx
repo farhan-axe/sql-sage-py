@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { DatabaseInfo, QueryRefinementAttempt } from "@/types/database";
@@ -57,11 +56,6 @@ const QueryDisplay = ({
     }
     
     onSave();
-    
-    toast({
-      title: "Query saved",
-      description: "The query has been saved as an example",
-    });
   };
 
   if (!query) return null;

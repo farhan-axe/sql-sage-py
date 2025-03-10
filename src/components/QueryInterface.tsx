@@ -259,17 +259,7 @@ const QueryInterface = ({
       return;
     }
     
-    const formattedQuery = formatQueryWithDatabasePrefix(
-      generatedQuery, 
-      databaseInfo.connectionConfig.database
-    );
-    
-    console.log("Saving query:", {
-      question,
-      formattedQuery
-    });
-    
-    onSaveQuery(question, formattedQuery);
+    onSaveQuery(question, generatedQuery);
     
     toast({
       title: "Query saved",
