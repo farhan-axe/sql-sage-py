@@ -16,8 +16,9 @@ export function formatQueryWithDatabasePrefix(query: string, dbName: string): st
 
 /**
  * Save a query to localStorage for a specific database connection
+ * @returns boolean indicating if the save was successful
  */
-export function saveQueryToLocalStorage(server: string, database: string, question: string, query: string): void {
+export function saveQueryToLocalStorage(server: string, database: string, question: string, query: string): boolean {
   try {
     const savedQueriesKey = `savedQueries_${server}_${database}`;
     let savedQueries = [];

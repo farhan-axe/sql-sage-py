@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import DatabaseConnection from "@/components/DatabaseConnection";
 import QueryInterface from "@/components/QueryInterface";
@@ -8,7 +9,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AlertCircle, DatabaseIcon, AlertTriangle, Clock } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { loadQueriesFromLocalStorage, updateQueryExamplesWithSavedQueries } from "@/utils/queryUtils";
+import { 
+  loadQueriesFromLocalStorage, 
+  updateQueryExamplesWithSavedQueries, 
+  saveQueryToLocalStorage,
+  formatQueryWithDatabasePrefix 
+} from "@/utils/queryUtils";
 
 const Index = () => {
   const [isConnected, setIsConnected] = useState(false);
@@ -94,7 +100,6 @@ const Index = () => {
     }
     
     const dbName = databaseInfo.connectionConfig.database;
-    
     const formattedQuery = formatQueryWithDatabasePrefix(query, dbName);
     
     const existingExamples = databaseInfo.queryExamples.split('\n\n').filter(e => e.trim());

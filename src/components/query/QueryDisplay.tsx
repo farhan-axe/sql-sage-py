@@ -61,7 +61,7 @@ const QueryDisplay = ({
     const database = databaseInfo.connectionConfig.database;
     const saved = saveQueryToLocalStorage(server, database, question, query);
     
-    if (saved) {
+    if (saved === true) {
       onSave();
     } else {
       toast({
