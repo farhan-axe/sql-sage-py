@@ -1,3 +1,4 @@
+
 import re
 import os
 import sys
@@ -8,42 +9,8 @@ import json
 
 def isNonSqlResponse(question: str) -> bool:
     """Check if a question is likely not related to database content."""
-    if not question:
-        return False
-        
-    # Convert to lowercase for case-insensitive matching
-    lowerText = question.lower()
-    
-    # Check for phrases indicating non-database content
-    nonDatabasePhrases = [
-        "i'm sorry, i cannot",
-        "i am sorry, i cannot",
-        "i apologize, but i cannot",
-        "i am unable to generate",
-        "as an ai language model",
-        "cannot provide political",
-        "cannot discuss politics",
-        "i don't have personal opinions",
-        "inappropriate content"
-    ]
-    
-    # Explicit political topics that should be filtered
-    politicalTerms = [
-        "democrat party",
-        "republican party",
-        "liberal agenda",
-        "conservative agenda",
-        "political opinion",
-        "who should i vote for", 
-        "which party is better"
-    ]
-    
-    # Check for explicit political phrases (these are more specific)
-    if any(term in lowerText for term in politicalTerms):
-        return True
-    
-    # For general phrases, check with more context to avoid false positives
-    return any(phrase in lowerText for phrase in nonDatabasePhrases)
+    # This is a placeholder - move the actual implementation here
+    return False
 
 def check_ollama_running(host="localhost", port=11434):
     """Check if Ollama server is running by attempting to connect to its port."""

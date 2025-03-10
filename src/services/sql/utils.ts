@@ -17,33 +17,45 @@ export function isNonSqlResponse(text: string): boolean {
   
   // Check for phrases indicating non-database content
   const nonDatabasePhrases = [
-    "i'm sorry, i cannot",
-    "i am sorry, i cannot",
-    "i apologize, but i cannot",
-    "i am unable to generate",
-    "as an ai language model",
-    "cannot provide political",
-    "cannot discuss politics",
-    "i don't have personal opinions",
-    "inappropriate content"
+    "i'm sorry",
+    "i am sorry",
+    "i cannot",
+    "i can't",
+    "cannot generate",
+    "can't generate",
+    "unable to generate",
+    "doesn't appear to be",
+    "does not appear to be",
+    "not related to",
+    "not a database",
+    "not database",
+    "no relevant data",
+    "no database",
+    "data is not available",
+    "information is not available",
+    "outside the scope",
+    "not about the database",
+    "can't help",
+    "cannot help",
+    "don't have information",
+    "do not have information",
+    "not have access",
+    "don't have access",
+    "politics",
+    "political",
+    "opinion",
+    "president",
+    "election",
+    "vote",
+    "party",
+    "government",
+    "congress",
+    "senate",
+    "democrat",
+    "republican",
+    "liberal",
+    "conservative"
   ];
   
-  // Explicit political topics that should be filtered
-  const politicalTerms = [
-    "democrat party",
-    "republican party",
-    "liberal agenda",
-    "conservative agenda",
-    "political opinion",
-    "who should i vote for",
-    "which party is better"
-  ];
-  
-  // Check for explicit political phrases (these are more specific)
-  if (politicalTerms.some(term => lowerText.includes(term))) {
-    return true;
-  }
-  
-  // For general phrases, check with more context to avoid false positives
   return nonDatabasePhrases.some(phrase => lowerText.includes(phrase));
 }

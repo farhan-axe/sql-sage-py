@@ -80,6 +80,16 @@ const QueryForm = ({
       return false;
     }
     
+    if (isNonSqlResponse(text)) {
+      console.log("Non-database question detected:", text);
+      toast({
+        title: "Non-database question detected",
+        description: "Please ask a question related to your database content",
+        variant: "destructive",
+      });
+      return false;
+    }
+    
     return true;
   };
 
@@ -229,7 +239,7 @@ const QueryForm = ({
     }, 180000);
     
     setSessionTimeout(timeout);
-    const startTime = Date.now();
+    const startTime = Date.now(); // Track when we start generating
     
     try {
       console.log("Starting query generation...");
@@ -253,17 +263,17 @@ const QueryForm = ({
       );
 
       const generatedData = await generateResponse.json();
-      const endTime = Date.now();
+      const endTime = Date.now(); // Track when we finish generating
       const timeElapsed = endTime - startTime;
       
       console.log("Generated response from backend:", generatedData.query);
       console.log(`Query generation took ${timeElapsed}ms`);
       
       if (isNonSqlResponse(generatedData.query)) {
-        console.log("Detected non-SQL response in generated query");
+        console.log("Detected non-SQL response, displaying as error message");
         toast({
           title: "Cannot generate SQL query",
-          description: "Your question appears to be unrelated to the database or contains non-database topics",
+          description: "The database does not contain the requested information",
           variant: "destructive",
         });
         onQueryGeneration("", 0);
@@ -274,14 +284,7 @@ const QueryForm = ({
       console.log("Extracted SQL query:", extractedQuery);
       
       if (!extractedQuery) {
-        console.log("Failed to extract SQL query from response");
-        toast({
-          title: "Failed to generate SQL query",
-          description: "Could not extract a valid SQL query from the response",
-          variant: "destructive",
-        });
-        onQueryGeneration("", 0);
-        return;
+        throw new Error('Failed to extract a valid SQL query from the response');
       }
       
       let finalQuery = extractedQuery;
