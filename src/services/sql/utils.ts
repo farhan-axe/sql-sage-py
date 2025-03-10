@@ -41,6 +41,20 @@ export function isNonSqlResponse(text: string): boolean {
     "do not have information",
     "not have access",
     "don't have access",
+    "politics",
+    "political",
+    "opinion",
+    "president",
+    "election",
+    "vote",
+    "party",
+    "government",
+    "congress",
+    "senate",
+    "democrat",
+    "republican",
+    "liberal",
+    "conservative"
   ];
   
   return nonDatabasePhrases.some(phrase => lowerText.includes(phrase));
