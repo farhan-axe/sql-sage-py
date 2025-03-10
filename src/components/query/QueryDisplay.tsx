@@ -1,8 +1,9 @@
+
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { DatabaseInfo, QueryRefinementAttempt } from "@/types/database";
 import { RotateCcw, PlayCircle, XCircle, Clock, Save } from "lucide-react";
-import { formatQueryWithDatabasePrefix } from "@/utils/queryUtils";
+import { formatQueryWithDatabasePrefix, saveQueryToLocalStorage } from "@/utils/queryUtils";
 
 interface QueryDisplayProps {
   query: string;
@@ -55,7 +56,19 @@ const QueryDisplay = ({
       return;
     }
     
-    onSave();
+    // Use the utility function to save to localStorage
+    const server = databaseInfo.connectionConfig.server;
+    const database = databaseInfo.connectionConfig.database;
+    const saved = saveQueryToLocalStorage(server, database, question, query);
+    
+    if (saved) {
+      onSave();
+    } else {
+      toast({
+        title: "Query already saved",
+        description: "This query is already in your examples",
+      });
+    }
   };
 
   if (!query) return null;

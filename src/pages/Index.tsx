@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import DatabaseConnection from "@/components/DatabaseConnection";
 import QueryInterface from "@/components/QueryInterface";
@@ -9,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AlertCircle, DatabaseIcon, AlertTriangle, Clock } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { loadQueriesFromLocalStorage, updateQueryExamplesWithSavedQueries } from "@/utils/queryUtils";
 
 const Index = () => {
   const [isConnected, setIsConnected] = useState(false);
@@ -43,126 +43,60 @@ const Index = () => {
     });
     
     setIsConnected(true);
-    setDatabaseInfo(info);
     
-    loadSavedQueries(info);
-  };
-  
-  const formatQueryExamples = (examples: string, dbName: string): string => {
-    if (!examples || !dbName) return examples;
+    const savedQueries = loadQueriesFromLocalStorage(
+      info.connectionConfig.server, 
+      info.connectionConfig.database
+    );
     
-    const tableRegex = /\b(FROM|JOIN)\s+(?!\[?[\w]+\]?\.\[?[\w]+\]?\.\[?)([\w\[\]]+)/gi;
-    
-    return examples.replace(tableRegex, (match, clause, tableName) => {
-      const cleanTableName = tableName.replace(/\[|\]/g, '');
-      return `${clause} [${dbName}].[dbo].[${cleanTableName}]`;
-    });
-  };
-  
-  const loadSavedQueries = (info: DatabaseInfo) => {
-    try {
-      const savedQueriesKey = `savedQueries_${info.connectionConfig.server}_${info.connectionConfig.database}`;
-      const savedQueriesString = localStorage.getItem(savedQueriesKey);
+    if (savedQueries && savedQueries.length > 0) {
+      console.log(`Loaded ${savedQueries.length} saved queries from localStorage`);
       
-      if (savedQueriesString) {
-        const savedQueries = JSON.parse(savedQueriesString);
-        console.log("Loaded saved queries from localStorage:", savedQueries.length);
-        
-        if (savedQueries.length > 0) {
-          // Create a copy of the original examples to ensure we don't duplicate
-          let formattedExamples = info.queryExamples ? info.queryExamples : '';
-          
-          // Skip examples formatting if it includes our test case to avoid duplication
-          if (!formattedExamples.includes("provide me list of products, sales territory")) {
-            formattedExamples = formatQueryExamples(formattedExamples, info.connectionConfig.database);
-          }
-          
-          // Calculate the starting example number
-          const existingExamples = formattedExamples.split('\n\n').filter(e => e.trim());
-          const startingExampleIndex = existingExamples.length > 0 ? 
-            existingExamples.length + 1 : 1;
-          
-          // Parse existing examples to avoid duplicates
-          const existingQuestionsSet = new Set();
-          existingExamples.forEach(example => {
-            // Extract question from the example
-            const questionMatch = example.match(/^\d+\.\s+(.*?)\?,/);
-            if (questionMatch && questionMatch[1]) {
-              existingQuestionsSet.add(questionMatch[1].toLowerCase().trim());
-            }
-          });
-          
-          // Add saved queries if they don't already exist in the examples
-          savedQueries.forEach((savedQuery: any, index: number) => {
-            // Skip if this question already exists
-            if (existingQuestionsSet.has(savedQuery.question.toLowerCase().trim())) {
-              console.log(`Skipping duplicate question: ${savedQuery.question}`);
-              return;
-            }
-            
-            const formattedQuery = formatQueryExamples(savedQuery.query, info.connectionConfig.database);
-            
-            const exampleNumber = startingExampleIndex + index;
-            const exampleText = `\n\n${exampleNumber}. ${savedQuery.question}?,\nYour SQL Query will be like "${formattedQuery}"\n`;
-            formattedExamples += exampleText;
-            
-            // Add to set to avoid future duplicates
-            existingQuestionsSet.add(savedQuery.question.toLowerCase().trim());
-          });
-          
-          // Update examples only if there were changes
-          if (formattedExamples !== info.queryExamples) {
-            console.log("Updated examples with saved queries");
-            setDatabaseInfo({
-              ...info,
-              queryExamples: formattedExamples
-            });
-          }
-        }
+      const updatedExamples = updateQueryExamplesWithSavedQueries(
+        info.queryExamples,
+        info.connectionConfig.database,
+        savedQueries
+      );
+      
+      if (updatedExamples !== info.queryExamples) {
+        setDatabaseInfo({
+          ...info,
+          queryExamples: updatedExamples
+        });
+      } else {
+        setDatabaseInfo(info);
       }
-    } catch (error) {
-      console.error("Error loading saved queries:", error);
+    } else {
+      setDatabaseInfo(info);
     }
   };
 
   const handleSaveQuery = (question: string, query: string) => {
-    if (!databaseInfo) return;
-    
-    console.log("Saving query to examples:", { question, query });
-    
-    // Save to localStorage for persistence
-    try {
-      const savedQueriesKey = `savedQueries_${databaseInfo.connectionConfig.server}_${databaseInfo.connectionConfig.database}`;
-      let savedQueries = [];
-      
-      const existingSavedQueriesString = localStorage.getItem(savedQueriesKey);
-      if (existingSavedQueriesString) {
-        savedQueries = JSON.parse(existingSavedQueriesString);
-      }
-      
-      // Check if this query already exists
-      const queryExists = savedQueries.some((q: any) => 
-        q.question.toLowerCase().trim() === question.toLowerCase().trim()
-      );
-      
-      if (!queryExists) {
-        savedQueries.push({ question, query });
-        localStorage.setItem(savedQueriesKey, JSON.stringify(savedQueries));
-        console.log(`Saved query to localStorage. Total saved queries: ${savedQueries.length}`);
-      } else {
-        console.log("Query already exists in saved queries, not saving duplicate");
-      }
-    } catch (error) {
-      console.error("Error saving query to localStorage:", error);
+    if (!question || !query || !databaseInfo) {
+      console.log("Cannot save query - missing required data:", {
+        hasQuestion: Boolean(question),
+        hasQuery: Boolean(query),
+        hasDatabaseInfo: Boolean(databaseInfo)
+      });
+      return;
     }
     
-    // Update the examples in databaseInfo
+    const server = databaseInfo.connectionConfig.server;
+    const database = databaseInfo.connectionConfig.database;
+    const saved = saveQueryToLocalStorage(server, database, question, query);
+    
+    if (!saved) {
+      toast({
+        title: "Query already saved",
+        description: "This query is already in your examples",
+      });
+      return;
+    }
+    
     const dbName = databaseInfo.connectionConfig.database;
     
-    // Format the query to include database prefix
     const formattedQuery = formatQueryWithDatabasePrefix(query, dbName);
     
-    // Check if this question already exists in the examples
     const existingExamples = databaseInfo.queryExamples.split('\n\n').filter(e => e.trim());
     const questionExists = existingExamples.some(example => {
       const questionMatch = example.match(/^\d+\.\s+(.*?)\?,/);
@@ -179,13 +113,10 @@ const Index = () => {
       return;
     }
     
-    // Determine the next example number
     const nextExampleNumber = existingExamples.length > 0 ? existingExamples.length + 1 : 1;
     
-    // Create the new example
     const newExample = `\n\n${nextExampleNumber}. ${question}?,\nYour SQL Query will be like "${formattedQuery}"\n`;
     
-    // Add header if this is the first example
     const updatedExamples = databaseInfo.queryExamples 
       ? `${databaseInfo.queryExamples}${newExample}` 
       : `Below are some examples of questions:${newExample}`;
@@ -197,14 +128,12 @@ const Index = () => {
     
     console.log("Updated query examples:", updatedExamples);
     
-    // Show success toast
     toast({
       title: "Query saved successfully",
       description: "The query has been added to your examples",
     });
   };
 
-  // Helper function to format query with database prefix
   const formatQueryWithDatabasePrefix = (query: string, dbName: string): string => {
     if (!query || !dbName) return query;
     
@@ -247,7 +176,7 @@ const Index = () => {
       if (databaseInfo.queryExamples) {
         if (databaseInfo.queryExamples.includes("57. provide me list of products, sales territory country name and their sales amount?")) {
           const updatedExamples = databaseInfo.queryExamples.replace(
-            /(57\. provide me list of products, sales territory country name and their sales amount\?,\s+Your SQL Query will be like "SELECT TOP 200\s+p\.EnglishProductName AS ProductName,\s+st\.SalesTerritoryCountry AS Country,\s+SUM\(f\.SalesAmount\) AS TotalSales\s+FROM \[)([^\]]+)(\]\.\[dbo\]\.\[DimProduct\] p\s+JOIN \[)([^\]]+)(\]\.\[dbo\]\.\[FactInternetSales\] f ON p\.ProductKey = f\.ProductKey\s+JOIN \[)([^\]]+)(\]\.\[dbo\]\.\[DimSalesTerritory\] st ON st\.SalesTerritoryKey = f\.SalesTerritoryKey\s+GROUP BY p\.EnglishProductName, st\.SalesTerritoryCountry;)/g,
+            /(57\. provide me list of products, sales territory country name and their sales amount\?,\s+Your SQL Query will be like "SELECT TOP 200\s+p\.EnglishProductName AS ProductName,\s+st\.SalesTerritoryCountry AS Country,\s+SUM\(f\.SalesAmount\) AS TotalSales\s+FROM \[)([^\]]+)(\]\.\[dbo\]\.\[DimProduct\] p\s+JOIN \[)([^\]]+)(\]\.\[dbo\]\.\[FactInternetSales\] f ON p\.ProductKey = f.ProductKey\s+JOIN \[)([^\]]+)(\]\.\[dbo\]\.\[DimSalesTerritory\] st ON st\.SalesTerritoryKey = f\.SalesTerritoryKey\s+GROUP BY p\.EnglishProductName, st\.SalesTerritoryCountry;)/g,
             (match, prefix, db1, middle1, db2, middle2, db3, suffix) => {
               return `${prefix}AdventureWorksDW2017${middle1}AdventureWorksDW2017${middle2}AdventureWorksDW2017${suffix}`;
             }
