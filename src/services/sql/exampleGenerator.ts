@@ -14,85 +14,7 @@ export function generateQueryExamples(tables: any[], dbName: string = ""): strin
     return 'No tables available to generate examples. Please make sure the database contains tables and you have permission to access them.';
   }
   
-  // Check if the most common tables from AdventureWorks DW are present
-  const hasCustomerTable = tables.some(t => t.name === 'DimCustomer');
-  const hasSalesTable = tables.some(t => t.name === 'FactInternetSales');
-  const hasProductTable = tables.some(t => t.name === 'DimProduct');
-  
-  // If this appears to be AdventureWorks DW, use the provided examples
-  if (hasCustomerTable && hasSalesTable) {
-    let examples = 'Below are some general examples of questions:\n\n';
-    
-    // First generate count examples for EACH table
-    tables.forEach((table, index) => {
-      if (table.name) {
-        // Add count example for each table with database.dbo prefix
-        examples += `${index + 1}. Calculate me the total number of records in ${table.name}?,\n`;
-        examples += `Your SQL Query will be like "SELECT COUNT(*) AS TotalRecords FROM [${dbName}].[dbo].[${table.name}];"\n\n`;
-      }
-    });
-    
-    // After the count examples, add the standard AdventureWorks examples
-    const startIndex = tables.length + 1;
-    
-    examples += `${startIndex}. Calculate me the total number of customers?,\n`;
-    examples += `Your SQL Query will be like "SELECT COUNT(DISTINCT CustomerKey) FROM [${dbName}].[dbo].[DimCustomer];"\n\n`;
-    
-    examples += `${startIndex + 1}. Calculate me the total number of customers who have purchased more than 5 products?,\n`;
-    examples += `Your SQL Query will be like "WITH InternetSalesCTE AS (
-    SELECT CustomerKey, ProductKey
-    FROM [${dbName}].[dbo].[FactInternetSales]
-)
-SELECT SUM(TotalProductsPurchased) FROM (
-    SELECT CustomerKey, COUNT(DISTINCT ProductKey) AS TotalProductsPurchased
-    FROM InternetSalesCTE
-    GROUP BY CustomerKey
-    HAVING COUNT(DISTINCT ProductKey) > 5
-) x;"\n\n`;
-    
-    examples += `${startIndex + 2}. Provide me the list of customers who have purchased more than 5 products?,\n`;
-    examples += `Your SQL Query will be like "WITH InternetSalesCTE AS (
-    SELECT CustomerKey, ProductKey
-    FROM [${dbName}].[dbo].[FactInternetSales]
-),
-CustomerPurchases AS (
-    SELECT CustomerKey, COUNT(DISTINCT ProductKey) AS TotalProductsPurchased
-    FROM InternetSalesCTE
-    GROUP BY CustomerKey
-    HAVING COUNT(DISTINCT ProductKey) > 5
-)
-SELECT d.CustomerKey, d.FirstName, d.LastName, cp.TotalProductsPurchased
-FROM [${dbName}].[dbo].[DimCustomer] d
-JOIN CustomerPurchases cp ON d.CustomerKey = cp.CustomerKey;"\n\n`;
-    
-    examples += `${startIndex + 3}. Provide me the top 3 customers with their products and sales?,\n`;
-    examples += `Your SQL Query will be like "WITH TopCustomers AS (
-    SELECT TOP 3 CustomerKey, SUM(SalesAmount) AS TotalSales
-    FROM [${dbName}].[dbo].[FactInternetSales]
-    GROUP BY CustomerKey
-    ORDER BY TotalSales DESC
-),
-CustomerProductSales AS (
-    SELECT CustomerKey, ProductKey, SUM(SalesAmount) AS ProductSales
-    FROM [${dbName}].[dbo].[FactInternetSales]
-    GROUP BY CustomerKey, ProductKey
-)
-SELECT 
-    dc.CustomerKey,
-    dc.FirstName,
-    dc.LastName,
-    dp.EnglishProductName AS Product,
-    cps.ProductSales
-FROM TopCustomers tc
-JOIN [${dbName}].[dbo].[DimCustomer] dc ON tc.CustomerKey = dc.CustomerKey
-JOIN CustomerProductSales cps ON tc.CustomerKey = cps.CustomerKey
-JOIN [${dbName}].[dbo].[DimProduct] dp ON cps.ProductKey = dp.ProductKey
-ORDER BY tc.TotalSales DESC, cps.ProductSales DESC;"\n\n`;
-    
-    return examples;
-  }
-  
-  // For other databases, generate examples for each table
+  // Start building examples
   let examples = 'Below are some general examples of questions:\n\n';
   
   // Sort tables by name for consistency
@@ -103,12 +25,15 @@ ORDER BY tc.TotalSales DESC, cps.ProductSales DESC;"\n\n`;
     return 0;
   });
 
-  // First, generate count examples for each table using the specific format
+  // First, generate count examples for each table
   sortedTables.forEach((table, index) => {
     if (table.name) {
-      // Add count example for each table with database.dbo prefix
-      examples += `${index + 1}. Calculate me the total number of records in ${table.name}?,\n`;
-      examples += `Your SQL Query will be like "SELECT COUNT(*) AS TotalRecords FROM [${dbName}].[dbo].[${table.name}];"\n\n`;
+      const fullTableName = table.fullName || `[${dbName}].[${table.schema || 'dbo'}].[${table.name}]`;
+      const displayName = table.displayName || table.name;
+      
+      // Add count example for each table with proper table name
+      examples += `${index + 1}. Calculate the total number of records in ${displayName}?,\n`;
+      examples += `Your SQL Query will be like "SELECT COUNT(*) AS TotalRecords FROM ${fullTableName};"\n\n`;
     }
   });
   
@@ -121,8 +46,11 @@ ORDER BY tc.TotalSales DESC, cps.ProductSales DESC;"\n\n`;
   
   if (exampleTables.length >= 1) {
     const table = exampleTables[0];
-    examples += `${exampleIndex}. Show me the top 10 records from ${table.name}?,\n`;
-    examples += `Your SQL Query will be like "SELECT TOP 10 * FROM [${dbName}].[dbo].[${table.name}];"\n\n`;
+    const fullTableName = table.fullName || `[${dbName}].[${table.schema || 'dbo'}].[${table.name}]`;
+    const displayName = table.displayName || table.name;
+    
+    examples += `${exampleIndex}. Show me the top 10 records from ${displayName}?,\n`;
+    examples += `Your SQL Query will be like "SELECT TOP 10 * FROM ${fullTableName};"\n\n`;
     exampleIndex++;
   }
   
@@ -130,62 +58,128 @@ ORDER BY tc.TotalSales DESC, cps.ProductSales DESC;"\n\n`;
     const table1 = exampleTables[0];
     const table2 = exampleTables[1];
     
+    const fullTableName1 = table1.fullName || `[${dbName}].[${table1.schema || 'dbo'}].[${table1.name}]`;
+    const fullTableName2 = table2.fullName || `[${dbName}].[${table2.schema || 'dbo'}].[${table2.name}]`;
+    
+    const displayName1 = table1.displayName || table1.name;
+    const displayName2 = table2.displayName || table2.name;
+    
     // Find potential join columns (looking for similar column names that might be keys)
     let joinColumn1 = "ID";
     let joinColumn2 = "ID";
     
-    if (table1.columnDetails && table2.columnDetails) {
-      const table1Columns = table1.columnDetails.map((col: any) => col.name || "");
-      const table2Columns = table2.columnDetails.map((col: any) => col.name || "");
-      
-      // Look for matching columns or columns with KEY or ID in the name
+    // Helper function to get column names from a table
+    const getColumnNames = (table: any): string[] => {
+      if (table.columns && Array.isArray(table.columns)) {
+        return table.columns.map((col: any) => {
+          return typeof col === 'string' ? col : (col.name || "");
+        });
+      }
+      return [];
+    };
+    
+    const table1Columns = getColumnNames(table1);
+    const table2Columns = getColumnNames(table2);
+    
+    // First look for primary keys
+    const findPrimaryKeyColumn = (table: any): string | null => {
+      if (table.columns && Array.isArray(table.columns)) {
+        for (const col of table.columns) {
+          if (typeof col !== 'string' && col.isPrimaryKey) {
+            return col.name;
+          }
+        }
+      }
+      return null;
+    };
+    
+    const pk1 = findPrimaryKeyColumn(table1);
+    const pk2 = findPrimaryKeyColumn(table2);
+    
+    if (pk1) joinColumn1 = pk1;
+    if (pk2) joinColumn2 = pk2;
+    
+    // If no primary keys, look for matching columns or columns with KEY or ID in the name
+    if (!pk1 || !pk2) {
+      // Look for exact column name matches
       for (const col1 of table1Columns) {
-        if (col1.toUpperCase().includes('KEY') || col1.toUpperCase().includes('ID')) {
-          joinColumn1 = col1;
-          break;
+        for (const col2 of table2Columns) {
+          if (col1.toLowerCase() === col2.toLowerCase()) {
+            joinColumn1 = col1;
+            joinColumn2 = col2;
+            break;
+          }
         }
       }
       
-      for (const col2 of table2Columns) {
-        if (col2.toUpperCase().includes('KEY') || col2.toUpperCase().includes('ID')) {
-          joinColumn2 = col2;
-          break;
+      // If still no match, look for ID/KEY columns
+      if (joinColumn1 === "ID" || joinColumn2 === "ID") {
+        for (const col1 of table1Columns) {
+          if (col1.toLowerCase().includes('id') || col1.toLowerCase().includes('key')) {
+            joinColumn1 = col1;
+            break;
+          }
+        }
+        
+        for (const col2 of table2Columns) {
+          if (col2.toLowerCase().includes('id') || col2.toLowerCase().includes('key')) {
+            joinColumn2 = col2;
+            break;
+          }
         }
       }
     }
     
-    examples += `${exampleIndex}. Join ${table1.name} with ${table2.name}?,\n`;
-    examples += `Your SQL Query will be like "SELECT t1.*, t2.*\nFROM [${dbName}].[dbo].[${table1.name}] t1\nJOIN [${dbName}].[dbo].[${table2.name}] t2 ON t1.${joinColumn1} = t2.${joinColumn2};"\n\n`;
+    examples += `${exampleIndex}. Join ${displayName1} with ${displayName2}?,\n`;
+    examples += `Your SQL Query will be like "SELECT t1.*, t2.*\nFROM ${fullTableName1} t1\nJOIN ${fullTableName2} t2 ON t1.${joinColumn1} = t2.${joinColumn2};"\n\n`;
     exampleIndex++;
   }
   
   if (exampleTables.length >= 1) {
     const table = exampleTables[0];
-    let groupByColumn = "";
+    const fullTableName = table.fullName || `[${dbName}].[${table.schema || 'dbo'}].[${table.name}]`;
+    const displayName = table.displayName || table.name;
     
     // Try to find a suitable column for GROUP BY
-    if (table.columnDetails) {
-      const columns = table.columnDetails.map((col: any) => col.name || "");
-      
-      // Look for a categorical column (avoiding ID columns)
-      for (const col of columns) {
-        if (!col.toUpperCase().includes('ID') && 
-            !col.toUpperCase().includes('KEY') && 
-            !col.toUpperCase().includes('DATE')) {
-          groupByColumn = col;
-          break;
-        }
+    let groupByColumn = "";
+    
+    // Helper function to get column information
+    const getColumnsInfo = (table: any): any[] => {
+      if (table.columns && Array.isArray(table.columns)) {
+        return table.columns.map((col: any) => {
+          if (typeof col === 'string') {
+            return { name: col, type: 'unknown' };
+          }
+          return col;
+        });
       }
+      return [];
+    };
+    
+    const columnsInfo = getColumnsInfo(table);
+    
+    // Look for a categorical column (avoiding ID columns)
+    for (const col of columnsInfo) {
+      const colName = col.name || "";
+      const colType = (col.type || "").toLowerCase();
       
-      // If no good categorical column was found, just use the first column
-      if (!groupByColumn && columns.length > 0) {
-        groupByColumn = columns[0];
+      if (!colName.toLowerCase().includes('id') && 
+          !colName.toLowerCase().includes('key') && 
+          !colName.toLowerCase().includes('date') &&
+          (colType.includes('char') || colType.includes('varchar') || colType === 'nvarchar')) {
+        groupByColumn = colName;
+        break;
       }
     }
     
+    // If no good categorical column was found, just use the first column
+    if (!groupByColumn && columnsInfo.length > 0) {
+      groupByColumn = columnsInfo[0].name || "";
+    }
+    
     if (groupByColumn) {
-      examples += `${exampleIndex}. Count records in ${table.name} grouped by ${groupByColumn}?,\n`;
-      examples += `Your SQL Query will be like "SELECT ${groupByColumn}, COUNT(*) AS Count\nFROM [${dbName}].[dbo].[${table.name}]\nGROUP BY ${groupByColumn}\nORDER BY Count DESC;"\n\n`;
+      examples += `${exampleIndex}. Count records in ${displayName} grouped by ${groupByColumn}?,\n`;
+      examples += `Your SQL Query will be like "SELECT ${groupByColumn}, COUNT(*) AS Count\nFROM ${fullTableName}\nGROUP BY ${groupByColumn}\nORDER BY Count DESC;"\n\n`;
       exampleIndex++;
     }
   }
@@ -193,32 +187,68 @@ ORDER BY tc.TotalSales DESC, cps.ProductSales DESC;"\n\n`;
   // Add a filter example
   if (exampleTables.length >= 1) {
     const table = exampleTables[0];
-    let filterColumn = "";
+    const fullTableName = table.fullName || `[${dbName}].[${table.schema || 'dbo'}].[${table.name}]`;
+    const displayName = table.displayName || table.name;
     
     // Try to find a suitable column for filtering
-    if (table.columnDetails) {
-      const columns = table.columnDetails.map((col: any) => col.name || "");
-      
-      // Look for a numeric column
-      for (const col of columns) {
-        if (col.toUpperCase().includes('AMOUNT') || 
-            col.toUpperCase().includes('PRICE') || 
-            col.toUpperCase().includes('COST') ||
-            col.toUpperCase().includes('QUANTITY')) {
-          filterColumn = col;
-          break;
-        }
+    let filterColumn = "";
+    
+    // Helper function to get column information
+    const getColumnsInfo = (table: any): any[] => {
+      if (table.columns && Array.isArray(table.columns)) {
+        return table.columns.map((col: any) => {
+          if (typeof col === 'string') {
+            return { name: col, type: 'unknown' };
+          }
+          return col;
+        });
       }
+      return [];
+    };
+    
+    const columnsInfo = getColumnsInfo(table);
+    
+    // Look for a numeric column or date column
+    for (const col of columnsInfo) {
+      const colName = col.name || "";
+      const colType = (col.type || "").toLowerCase();
       
-      // If no good numeric column was found, just use the first column
-      if (!filterColumn && columns.length > 0) {
-        filterColumn = columns[0];
+      if (colName.toLowerCase().includes('amount') || 
+          colName.toLowerCase().includes('price') || 
+          colName.toLowerCase().includes('cost') ||
+          colName.toLowerCase().includes('quantity') ||
+          colType.includes('int') ||
+          colType.includes('decimal') ||
+          colType.includes('float') ||
+          colType.includes('money')) {
+        filterColumn = colName;
+        break;
       }
     }
     
+    // If no numeric column, look for date column
+    if (!filterColumn) {
+      for (const col of columnsInfo) {
+        const colName = col.name || "";
+        const colType = (col.type || "").toLowerCase();
+        
+        if (colName.toLowerCase().includes('date') || 
+            colType.includes('date') ||
+            colType.includes('time')) {
+          filterColumn = colName;
+          break;
+        }
+      }
+    }
+    
+    // If still no column found, just use the first column
+    if (!filterColumn && columnsInfo.length > 0) {
+      filterColumn = columnsInfo[0].name || "";
+    }
+    
     if (filterColumn) {
-      examples += `${exampleIndex}. Get all records from ${table.name} where ${filterColumn} is greater than a specific value?,\n`;
-      examples += `Your SQL Query will be like "SELECT * FROM [${dbName}].[dbo].[${table.name}] WHERE ${filterColumn} > [value];"\n\n`;
+      examples += `${exampleIndex}. Get all records from ${displayName} where ${filterColumn} is greater than a specific value?,\n`;
+      examples += `Your SQL Query will be like "SELECT * FROM ${fullTableName} WHERE ${filterColumn} > [value];"\n\n`;
     }
   }
   

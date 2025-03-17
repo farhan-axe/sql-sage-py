@@ -45,9 +45,41 @@ def extract_sql_from_response(response_text: str) -> tuple[Optional[str], Option
 
     return None, "No SQL query found in the model's response."  # Indicate that no query was found
 
+def formatQueryWithDatabasePrefix(query: str, database_name: str) -> str:
+    """
+    Format a query to use the proper [DATABASE].[SCHEMA].[TABLE] format for all table references.
+    This is a more robust implementation that handles various scenarios.
+    """
+    if not query or not database_name:
+        return query
+    
+    # Process both FROM and JOIN table references
+    # This regex looks for table references without proper 3-part naming
+    table_pattern = r'\b(FROM|JOIN)\s+(?!\[?[\w]+\]?\.\[?[\w]+\]?\.\[?[\w]+\]?)(\[?[\w]+\]?)(?:\.\[?([\w]+)\]?)?'
+    
+    def replace_table_ref(match):
+        """Replace table references with proper 3-part names"""
+        clause = match.group(1)  # FROM or JOIN
+        first_part = match.group(2).strip('[]')  # First part (could be schema or table)
+        second_part = match.group(3)  # Optional second part
+        
+        if second_part:  # If there's a schema.table pattern
+            schema = first_part
+            table = second_part
+            return f"{clause} [{database_name}].[{schema}].[{table}]"
+        else:  # If there's just a table name
+            table = first_part
+            return f"{clause} [{database_name}].[dbo].[{table}]"  # Default to dbo schema
+    
+    # Apply the replacement
+    formatted_query = re.sub(table_pattern, replace_table_ref, query, flags=re.IGNORECASE)
+    
+    return formatted_query
+
 def format_query_examples(database_name: str, query_examples: str) -> str:
     """
-    Format query examples to use the correct [DATABASE].[dbo].[TABLE] format
+    Format query examples to use the correct [DATABASE].[SCHEMA].[TABLE] format
+    This improved version handles schemas correctly
     """
     if not query_examples:
         return ""
@@ -55,17 +87,27 @@ def format_query_examples(database_name: str, query_examples: str) -> str:
     # Replace LIMIT with TOP in any examples
     formatted_examples = query_examples.replace("LIMIT", "-- LIMIT (Note: Use TOP instead for SQL Server)")
     
-    # Ensure all table references use the format [DATABASE_NAME].[dbo].[TABLE_NAME]
+    # Ensure all table references use the format [DATABASE_NAME].[SCHEMA].[TABLE_NAME]
     if database_name:
-        # Reformat examples to consistently use [DATABASE].[dbo].[TABLE] format
-        def replace_table_reference(match):
-            clause = match.group(1)  # FROM or JOIN
-            table = match.group(2).strip('[]')  # Table name without brackets
-            return f"{clause} [{database_name}].[dbo].[{table}]"
+        # This pattern matches FROM/JOIN followed by table patterns that aren't already fully qualified
+        table_pattern = r'\b(FROM|JOIN)\s+(?!\[?[\w]+\]?\.\[?[\w]+\]?\.\[?[\w]+\]?)(\[?[\w]+\]?)(?:\.\[?([\w]+)\]?)?'
         
-        # This regex looks for FROM or JOIN followed by table names without database prefix
-        table_regex = r'\b(FROM|JOIN)\s+(?!\[?[\w]+\]?\.\[?[\w]+\]?\.\[?)([\w\[\]]+)'
-        formatted_examples = re.sub(table_regex, replace_table_reference, formatted_examples, flags=re.IGNORECASE)
+        def replace_table_ref(match):
+            """Replace table references with proper 3-part names"""
+            clause = match.group(1)  # FROM or JOIN
+            first_part = match.group(2).strip('[]')  # First part (could be schema or table)
+            second_part = match.group(3)  # Optional second part
+            
+            if second_part:  # If there's a schema.table pattern
+                schema = first_part
+                table = second_part
+                return f"{clause} [{database_name}].[{schema}].[{table}]"
+            else:  # If there's just a table name
+                table = first_part
+                return f"{clause} [{database_name}].[dbo].[{table}]"  # Default to dbo schema
+        
+        # Apply the replacement
+        formatted_examples = re.sub(table_pattern, replace_table_ref, formatted_examples, flags=re.IGNORECASE)
     
     return formatted_examples
 
@@ -88,7 +130,7 @@ def create_query_prompt(request_question: str, database_info: Dict[str, Any]) ->
     # Define the output rules in a separate variable, with stronger emphasis on proper table referencing
     output_rules = """
 ### Output Rules:
-1. **CRITICAL: ALL table references MUST use the format [DATABASE_NAME].[dbo].[TABLE_NAME]**
+1. **CRITICAL: ALL table references MUST use the format [DATABASE_NAME].[SCHEMA_NAME].[TABLE_NAME]**
 2. **STRICTLY follow the example format: "Your SQL Query will be like \"SQL QUERY HERE\""**
 3. **Do NOT include ```sql ``` markup or triple backticks.**
 4. **If the question asks for total expenses, use `SUM(amount) AS total_expense`.**
@@ -104,19 +146,19 @@ def create_query_prompt(request_question: str, database_info: Dict[str, Any]) ->
 14. **If the question asks for Customer Wise, Product Wise or Category Wise Count, for aggregated function then always use GROUP BY CLAUSE.**
 15. **Do not include ORDER BY clauses in subqueries, common table expressions, derived tables, inline functions, or views unless accompanied by TOP, OFFSET, or FOR XML, to avoid SQL Server errors.**
 16. **Always use SQL Server syntax: use TOP instead of LIMIT for row limitations.**
-17. **You MUST respond in the exact format: 'Your SQL Query will be like \"SELECT ... FROM [DATABASE_NAME].[dbo].[TABLE_NAME]\"'**
+17. **You MUST respond in the exact format: 'Your SQL Query will be like \"SELECT ... FROM [DATABASE_NAME].[SCHEMA_NAME].[TABLE_NAME]\"'**
 18. **DO NOT explain your SQL query, just provide the query in the format specified.**
-19. **If the question asks for products and sales territory data, ensure you join the tables correctly: DimProduct connects to FactInternetSales via ProductKey, and DimSalesTerritory connects to FactInternetSales via SalesTerritoryKey.**
-20. **CRITICAL: ALL table references MUST follow the pattern [DATABASE_NAME].[dbo].[TABLE_NAME], where DATABASE_NAME is the current database name.**
+19. **The SQL query MUST use the exact schema, table, and column names as defined in the database schema.**
+20. **CRITICAL: ALL table references MUST follow the pattern [DATABASE_NAME].[SCHEMA_NAME].[TABLE_NAME], where DATABASE_NAME is the current database name.**
 21. **Never omit the database name and schema in table references - always use the full three-part naming convention.**
-22. **Always use square brackets around database name, schema and table names to handle special characters and spaces correctly: [DATABASE_NAME].[dbo].[TABLE_NAME]**
+22. **Always use square brackets around database name, schema and table names to handle special characters and spaces correctly: [DATABASE_NAME].[SCHEMA_NAME].[TABLE_NAME]**
 """
 
     # Build the prompt using a triple-quoted f-string.
     prompt = f"""You are an expert in SQL Server. Your task is to generate a valid SQL Server query for the given question
 
         
-Here is the existing database table:
+Here is the existing database schema:
 {formatted_schema}
 
 # Use the user-provided query examples if available, otherwise use the defaults
@@ -126,9 +168,12 @@ Here are the output rules:
 {output_rules}
 
 IMPORTANT: Your output MUST follow the pattern "Your SQL Query will be like \"SQL QUERY HERE\"". Do not include triple backticks, explanations, or any other text.
-You MUST format all table references as [DATABASE_NAME].[dbo].[TABLE_NAME] where DATABASE_NAME is the current database name which is: {database_name}
+You MUST format all table references as [DATABASE_NAME].[SCHEMA_NAME].[TABLE_NAME] where:
+- DATABASE_NAME is the current database name which is: {database_name}
+- SCHEMA_NAME should be taken from the table definition in the schema
+- TABLE_NAME should exactly match what's in the schema
 
-User Question: {request_question} by looking at existing database table
+User Question: {request_question} by looking at existing database schema
 
 
 """
@@ -136,19 +181,6 @@ User Question: {request_question} by looking at existing database table
 
 def process_generated_query(query: str, database_name: str) -> str:
     """
-    Process the generated query to ensure it follows the required format
+    Process the generated query to ensure it follows the required format with correct schemas
     """
-    if database_name and query:
-        # This regex identifies table references without the database.dbo prefix
-        table_regex = r'\b(FROM|JOIN)\s+(?!\[?[\w]+\]?\.\[?[\w]+\]?\.\[?)([\w\[\]]+)'
-        
-        # Replace them with properly formatted references
-        def replace_table_ref(match):
-            clause = match.group(1)  # FROM or JOIN
-            table = match.group(2).strip('[]')  # Table name without brackets
-            return f"{clause} [{database_name}].[dbo].[{table}]"
-                
-        # Apply the regex substitution, with case insensitivity
-        return re.sub(table_regex, replace_table_ref, query, flags=re.IGNORECASE)
-    
-    return query
+    return formatQueryWithDatabasePrefix(query, database_name)

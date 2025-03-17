@@ -59,9 +59,9 @@ Output Rules:
 15. **When employing window functions or aggregation with an OVER() clause, ensure proper SQL Server syntax with appropriate use of PARTITION BY and ORDER BY within the OVER() clause.**
 16. **Always verify the SQL query syntax by cross-checking the provided table names, JOIN conditions, GROUP BY clauses, table aliases, and column names.**
 17. **If an exact column name is missing and feature engineering is necessary, apply the appropriate feature engineering techniques using available information.**
-18. **CRITICAL: ALL table references MUST follow the pattern [DATABASE_NAME].[dbo].[TABLE_NAME], where DATABASE_NAME is the current database name.**
+18. **CRITICAL: ALL table references MUST follow the pattern [DATABASE_NAME].[SCHEMA_NAME].[TABLE_NAME], where DATABASE_NAME is the current database name.**
 19. **Never omit the database name and schema in table references - always use the full three-part naming convention.**
-20. **Always use square brackets around database name, schema and table names to handle special characters and spaces correctly: [DATABASE_NAME].[dbo].[TABLE_NAME]**
+20. **Always use square brackets around database name, schema and table names to handle special characters and spaces correctly: [DATABASE_NAME].[SCHEMA_NAME].[TABLE_NAME]**
 """
 
         # Build the prompt using a triple-quoted f-string.
@@ -76,7 +76,10 @@ Here are the output rules:
 {output_rules}
 
 IMPORTANT: Your output MUST be a SQL query enclosed in a code block with SQL syntax highlighting (```sql ... ```).
-You MUST format all table references as [DATABASE_NAME].[dbo].[TABLE_NAME] where DATABASE_NAME is the current database name which is: {database_name}
+You MUST format all table references with full three-part names: [DATABASE_NAME].[SCHEMA_NAME].[TABLE_NAME] where:
+- DATABASE_NAME is the current database name which is: {database_name}
+- SCHEMA_NAME should be taken from the table definition in the schema above (not assumed)
+- TABLE_NAME should exactly match what's in the schema
 
 User Question: {request['question']}
 """

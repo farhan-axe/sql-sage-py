@@ -76,20 +76,12 @@ export const parseDatabase = async (
     
     const responseText = await response.text();
     console.log("Parse database response length:", responseText.length);
-    console.log("Response text preview:", responseText.substring(0, 100));
-    
-    // Add more detailed logging to diagnose the issue
-    console.log("Full response from backend:", responseText);
     
     // Try to parse the response as JSON, with better error handling
     try {
       const data = JSON.parse(responseText);
       
-      // Add detailed logging to see what's in the parsed data
-      console.log("Parsed data from backend:", JSON.stringify(data, null, 2));
-      
-      // CRITICAL FIX: Backend returns 'tables' but frontend expects 'schema'
-      // Map the response correctly based on what we saw in the backend code
+      // Map the response correctly
       const tables = data.tables || [];
       
       // Check if tables is empty or undefined and provide better logging
@@ -115,17 +107,34 @@ export const parseDatabase = async (
       
       console.log(`Parsed schema successfully with ${tables.length} tables`);
       
-      // Generate prompt template from the tables data with updated title format
+      // Generate prompt template from the tables data
       let promptTemplate = "Below is the database schema\n\n";
       tables.forEach((table: any) => {
         if (table.name) {
-          // Updated format to match the requested style
-          promptTemplate += `There is table name ${table.name} used for calculating records based on ${table.primaryKey || 'None defined'} and below are the columns mentioned:\n\n`;
+          const schemaName = table.schema || 'dbo';
+          const displayName = table.displayName || table.name;
+          const primaryKey = table.primaryKey || 'None defined';
+          
+          promptTemplate += `There is table name ${displayName} used for calculating records based on ${primaryKey} and below are the columns mentioned:\n\n`;
           promptTemplate += `SELECT\n`;
           
-          if (table.schema && table.schema.length > 0) {
-            table.schema.forEach((column: string, index: number) => {
+          if (table.columns && table.columns.length > 0) {
+            table.columns.forEach((column: any, index: number) => {
+              // Format column information
+              const columnName = typeof column === 'string' ? column : column.name;
+              const columnType = column.type ? ` /* ${column.type} */` : '';
+              const isPK = column.isPrimaryKey ? ' /* Primary Key */' : '';
+              
               // Add commas after each column except the last one
+              if (index < table.columns.length - 1) {
+                promptTemplate += `${columnName}${columnType}${isPK},\n`;
+              } else {
+                promptTemplate += `${columnName}${columnType}${isPK}\n`;
+              }
+            });
+          } else if (table.schema && Array.isArray(table.schema) && table.schema.length > 0) {
+            // Fallback to old format if present
+            table.schema.forEach((column: string, index: number) => {
               if (index < table.schema.length - 1) {
                 promptTemplate += `${column},\n`;
               } else {
@@ -134,12 +143,14 @@ export const parseDatabase = async (
             });
           }
           
-          promptTemplate += `FROM [${database}].[dbo].[${table.name}];\n\n`;
-          promptTemplate += `Primary Key: ${table.primaryKey || 'None defined'}\n\n`;
+          // Use the fullName when available, otherwise construct it
+          const fullTableName = table.fullName || `[${database}].[${schemaName}].[${table.name}]`;
+          promptTemplate += `FROM ${fullTableName};\n\n`;
+          promptTemplate += `Primary Key: ${primaryKey}\n\n`;
         }
       });
       
-      // Generate query examples based on the tables data - pass database name
+      // Generate query examples based on the tables data
       const queryExamples = generateQueryExamples(tables, database);
       console.log("Generated query examples:", queryExamples.substring(0, 200) + "...");
       

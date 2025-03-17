@@ -73,23 +73,46 @@ def parse_database_schema(config: ConnectionConfig) -> Dict[str, Any]:
         cnxn = pyodbc.connect(conn_str)
         cursor = cnxn.cursor()
         
-        # Retrieve database schema - UPDATED to include database name
+        # First, get the default schema for the database
+        cursor.execute("""
+            SELECT SCHEMA_NAME
+            FROM INFORMATION_SCHEMA.SCHEMATA
+            WHERE CATALOG_NAME = DB_NAME()
+            AND SCHEMA_NAME <> 'INFORMATION_SCHEMA'
+            AND SCHEMA_NAME <> 'sys'
+            AND SCHEMA_NAME <> 'guest'
+            ORDER BY CASE WHEN SCHEMA_NAME = 'dbo' THEN 0 ELSE 1 END, SCHEMA_NAME
+        """)
+        
+        # Get all schemas, with dbo as default if exists
+        schemas = [row.SCHEMA_NAME for row in cursor.fetchall()]
+        default_schema = schemas[0] if schemas else 'dbo'  # Default to 'dbo' if no schema found
+        
+        logger.info(f"Found schemas: {schemas}, using default: {default_schema}")
+        
+        # Retrieve database schema with all schemas
         cursor.execute("""
             SELECT 
                 DB_NAME() as DATABASE_NAME,
-                t.TABLE_NAME,
-                c.COLUMN_NAME,
-                c.DATA_TYPE,
-                CASE WHEN kcu.COLUMN_NAME IS NOT NULL THEN 'YES' ELSE 'NO' END as IS_PRIMARY_KEY
-            FROM INFORMATION_SCHEMA.TABLES t
-            JOIN INFORMATION_SCHEMA.COLUMNS c 
-                ON t.TABLE_NAME = c.TABLE_NAME
-            LEFT JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE kcu 
-                ON c.TABLE_NAME = kcu.TABLE_NAME 
-                AND c.COLUMN_NAME = kcu.COLUMN_NAME
-                AND kcu.CONSTRAINT_NAME LIKE 'PK%'
-            WHERE t.TABLE_TYPE = 'BASE TABLE'
-            ORDER BY t.TABLE_NAME, c.ORDINAL_POSITION
+                s.name as SCHEMA_NAME,
+                t.name as TABLE_NAME,
+                c.name as COLUMN_NAME,
+                ty.name as DATA_TYPE,
+                CASE 
+                    WHEN pk.column_id IS NOT NULL THEN 'YES' 
+                    ELSE 'NO' 
+                END as IS_PRIMARY_KEY
+            FROM sys.tables t
+            JOIN sys.schemas s ON t.schema_id = s.schema_id
+            JOIN sys.columns c ON t.object_id = c.object_id
+            JOIN sys.types ty ON c.user_type_id = ty.user_type_id
+            LEFT JOIN (
+                SELECT ic.object_id, ic.column_id
+                FROM sys.indexes i
+                JOIN sys.index_columns ic ON i.object_id = ic.object_id AND i.index_id = ic.index_id
+                WHERE i.is_primary_key = 1
+            ) pk ON t.object_id = pk.object_id AND c.column_id = pk.column_id
+            ORDER BY t.name, c.column_id
         """)
         
         # Process schema results
@@ -99,21 +122,27 @@ def parse_database_schema(config: ConnectionConfig) -> Dict[str, Any]:
         
         for row in cursor.fetchall():
             db_name = row.DATABASE_NAME
+            schema_name = row.SCHEMA_NAME
             table_name = row.TABLE_NAME
             column_name = row.COLUMN_NAME
             data_type = row.DATA_TYPE
             is_primary_key = row.IS_PRIMARY_KEY
             
-            if current_table is None or current_table["name"] != table_name:
+            table_full_name = f"[{db_name}].[{schema_name}].[{table_name}]"
+            table_display_name = f"{schema_name}.{table_name}" if schema_name != default_schema else table_name
+            
+            if current_table is None or current_table["name"] != table_name or current_table["schema"] != schema_name:
                 if current_table is not None:
                     tables.append(current_table)
                 
                 current_table = {
                     "name": table_name,
-                    "fullName": f"[{db_name}].[dbo].[{table_name}]",  # Added fully qualified name
+                    "schema": schema_name,
+                    "fullName": table_full_name,
+                    "displayName": table_display_name,
                     "columns": []
                 }
-                prompt_template += f"Table: [{db_name}].[dbo].[{table_name}]\n"  # Updated format
+                prompt_template += f"Table: {table_full_name}\n"
             
             current_table["columns"].append({
                 "name": column_name,
@@ -126,8 +155,22 @@ def parse_database_schema(config: ConnectionConfig) -> Dict[str, Any]:
         if current_table is not None:
             tables.append(current_table)
         
+        # If no tables were found
+        if not tables:
+            prompt_template = "### Database Schema:\n\nNo tables found in the database."
+            return {
+                "tables": [],
+                "promptTemplate": prompt_template,
+                "queryExamples": "No tables available to generate examples.",
+                "connectionConfig": {
+                    "server": config.server,
+                    "database": config.database,
+                    "useWindowsAuth": config.useWindowsAuth
+                }
+            }
+        
         # Generate example queries based on the schema
-        query_examples = generate_example_queries(db_name, tables)
+        query_examples = generate_example_queries(db_name, tables, default_schema)
         
         logger.info(f"✅ Parsed {len(tables)} tables.")
         return {
@@ -150,7 +193,7 @@ def parse_database_schema(config: ConnectionConfig) -> Dict[str, Any]:
         if 'cnxn' in locals():
             cnxn.close()
 
-def generate_example_queries(database_name, tables):
+def generate_example_queries(database_name, tables, default_schema='dbo'):
     """
     Generates example SQL queries based on the database schema.
     """
@@ -161,21 +204,70 @@ def generate_example_queries(database_name, tables):
     
     # For each table, generate a count query
     for i, table in enumerate(tables[:20], 1):  # Limit to 20 tables for brevity
-        table_name = table["name"]
-        full_table_name = table["fullName"]  # Use the full qualified name
+        table_name = table.get("displayName") or table.get("name")
+        full_table_name = table.get("fullName") or f"[{database_name}].[{table.get('schema', default_schema)}].[{table.get('name')}]"
         
-        examples += f"{i}. Calculate me the total number of records in {table_name}?,\n"
+        examples += f"{i}. Calculate the total number of records in {table_name}?,\n"
         examples += f"Your SQL Query will be like \"SELECT COUNT(*) AS TotalRecords FROM {full_table_name};\"\n\n"
     
     # Add more complex examples if there are multiple tables
     if len(tables) >= 2:
         # Add a SELECT TOP example
-        examples += f"{len(tables[:20]) + 1}. Show me the top 10 records from {tables[0]['name']}?,\n"
-        examples += f"Your SQL Query will be like \"SELECT TOP 10 * FROM {tables[0]['fullName']};\"\n\n"
+        table0_name = tables[0].get("displayName") or tables[0].get("name")
+        full_table0_name = tables[0].get("fullName") or f"[{database_name}].[{tables[0].get('schema', default_schema)}].[{tables[0].get('name')}]"
         
-        # Add a JOIN example if we can find tables that might be related
-        examples += f"{len(tables[:20]) + 2}. Join {tables[0]['name']} with {tables[1]['name']}?,\n"
-        examples += f"Your SQL Query will be like \"SELECT t1.*, t2.*\nFROM {tables[0]['fullName']} t1\nJOIN {tables[1]['fullName']} t2 ON t1.ID = t2.ID;\"\n\n"
+        examples += f"{len(tables[:20]) + 1}. Show me the top 10 records from {table0_name}?,\n"
+        examples += f"Your SQL Query will be like \"SELECT TOP 10 * FROM {full_table0_name};\"\n\n"
+        
+        # Add a JOIN example
+        table1_name = tables[1].get("displayName") or tables[1].get("name")
+        full_table1_name = tables[1].get("fullName") or f"[{database_name}].[{tables[1].get('schema', default_schema)}].[{tables[1].get('name')}]"
+        
+        # Try to find potential join columns
+        join_col1 = None
+        join_col2 = None
+        
+        # Look for primary keys first
+        for col in tables[0].get("columns", []):
+            if isinstance(col, dict) and col.get("isPrimaryKey"):
+                join_col1 = col.get("name")
+                break
+        
+        for col in tables[1].get("columns", []):
+            if isinstance(col, dict) and col.get("isPrimaryKey"):
+                join_col2 = col.get("name")
+                break
+        
+        # If no primary keys, look for ID columns
+        if not join_col1:
+            for col in tables[0].get("columns", []):
+                col_name = col.get("name") if isinstance(col, dict) else col
+                if col_name and ("id" in col_name.lower() or "key" in col_name.lower()):
+                    join_col1 = col_name
+                    break
+        
+        if not join_col2:
+            for col in tables[1].get("columns", []):
+                col_name = col.get("name") if isinstance(col, dict) else col
+                if col_name and ("id" in col_name.lower() or "key" in col_name.lower()):
+                    join_col2 = col_name
+                    break
+        
+        # If still no columns found, use first column from each table
+        if not join_col1 and tables[0].get("columns") and len(tables[0].get("columns")) > 0:
+            col = tables[0].get("columns")[0]
+            join_col1 = col.get("name") if isinstance(col, dict) else col
+        
+        if not join_col2 and tables[1].get("columns") and len(tables[1].get("columns")) > 0:
+            col = tables[1].get("columns")[0]
+            join_col2 = col.get("name") if isinstance(col, dict) else col
+        
+        # Default to "ID" if all else fails
+        join_col1 = join_col1 or "ID"
+        join_col2 = join_col2 or "ID"
+        
+        examples += f"{len(tables[:20]) + 2}. Join {table0_name} with {table1_name}?,\n"
+        examples += f"Your SQL Query will be like \"SELECT t1.*, t2.*\nFROM {full_table0_name} t1\nJOIN {full_table1_name} t2 ON t1.{join_col1} = t2.{join_col2};\"\n\n"
     
     return examples
 
