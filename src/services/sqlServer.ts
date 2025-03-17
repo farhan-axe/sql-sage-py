@@ -8,4 +8,5 @@
 export { connectToServer, terminateSession } from './sql/connection';
 export { parseDatabase } from './sql/parser';
 export { generateQueryExamples } from './sql/exampleGenerator';
-export { isNonSqlResponse } from './sql/utils';
+export { isNonSqlResponse, formatQueryResults } from './sql/utils';
+
