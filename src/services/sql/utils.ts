@@ -1,5 +1,3 @@
-import { isNonSqlResponsePy } from "./utils.py";
-
 /**
  * Determines if the input appears to be a non-database question
  * @param input User's question
@@ -7,7 +5,7 @@ import { isNonSqlResponsePy } from "./utils.py";
  */
 export function isNonSqlResponse(input: string): boolean {
   // This is a client-side check before sending to the server
-  // For more precise checks, the server also uses the Python implementation
+  // For more precise checks, the server also uses a Python implementation
   
   // Convert to lower case for case-insensitive matching
   const lowerInput = input.toLowerCase();
