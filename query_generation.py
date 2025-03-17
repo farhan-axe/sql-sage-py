@@ -48,28 +48,51 @@ def extract_sql_from_response(response_text: str) -> tuple[Optional[str], Option
 def formatQueryWithDatabasePrefix(query: str, database_name: str) -> str:
     """
     Format a query to use the proper [DATABASE].[SCHEMA].[TABLE] format for all table references.
-    This is a more robust implementation that handles various scenarios.
+    This is a more robust implementation that handles various table reference formats.
     """
     if not query or not database_name:
         return query
     
-    # Process both FROM and JOIN table references
-    # This regex looks for table references without proper 3-part naming
-    table_pattern = r'\b(FROM|JOIN)\s+(?!\[?[\w]+\]?\.\[?[\w]+\]?\.\[?[\w]+\]?)(\[?[\w]+\]?)(?:\.\[?([\w]+)\]?)?'
+    # First, check if we have a schema that looks like column definitions 
+    # (indicating a schema parsing error)
+    schema_pattern = r'\[([^]]+)\]\.\[([^]]+)\]'
+    schemas = re.findall(schema_pattern, query)
+    
+    # Process FROM and JOIN table references
+    # This regex looks for table references in various formats
+    table_pattern = r'\b(FROM|JOIN)\s+(?:\[?([^\s\[\]]+)\]?\.)?(?:\[?([^\s\[\]]+)\]?\.)?(?:\[?([^\s\[\](),;]+)\]?)'
     
     def replace_table_ref(match):
-        """Replace table references with proper 3-part names"""
+        """Replace table references with proper 3-part names with schema validation"""
         clause = match.group(1)  # FROM or JOIN
-        first_part = match.group(2).strip('[]')  # First part (could be schema or table)
-        second_part = match.group(3)  # Optional second part
+        first_part = match.group(2)  # Could be database or schema
+        second_part = match.group(3)  # Could be schema or table
+        third_part = match.group(4)  # Should be table
         
-        if second_part:  # If there's a schema.table pattern
-            schema = first_part
-            table = second_part
-            return f"{clause} [{database_name}].[{schema}].[{table}]"
-        else:  # If there's just a table name
-            table = first_part
-            return f"{clause} [{database_name}].[dbo].[{table}]"  # Default to dbo schema
+        # Check if any part looks like column definitions (containing spaces or data types)
+        possible_column_def = any(part and re.search(r'\s|int|varchar|char|datetime|nvarchar|text|bit|float', part, re.IGNORECASE) 
+                                for part in [first_part, second_part, third_part] if part)
+        
+        if possible_column_def:
+            # Assume dbo schema if we detect column definitions being used as schema
+            return f"{clause} [{database_name}].[dbo].[{third_part}]"
+        
+        if first_part and second_part and third_part:
+            # Already has a 3-part name, ensure database is correct
+            return f"{clause} [{database_name}].[{second_part}].[{third_part}]"
+        elif second_part and third_part:
+            # Has schema.table format
+            return f"{clause} [{database_name}].[{second_part}].[{third_part}]"
+        elif first_part and third_part:
+            # Has database.table format (missing schema)
+            return f"{clause} [{database_name}].[dbo].[{third_part}]"
+        elif third_part:
+            # Just has table name
+            return f"{clause} [{database_name}].[dbo].[{third_part}]"
+        else:
+            # Something went wrong, return the original
+            logger.warning(f"Unable to parse table reference: {match.group(0)}")
+            return match.group(0)
     
     # Apply the replacement
     formatted_query = re.sub(table_pattern, replace_table_ref, query, flags=re.IGNORECASE)
@@ -81,6 +104,7 @@ def format_query_examples(database_name: str, query_examples: str) -> str:
     Format query examples to use the correct [DATABASE].[SCHEMA].[TABLE] format
     This improved version handles schemas correctly
     """
+    # ... keep existing code (examples formatting implementation)
     if not query_examples:
         return ""
     
@@ -115,6 +139,7 @@ def create_query_prompt(request_question: str, database_info: Dict[str, Any]) ->
     """
     Create a well-formatted prompt for query generation
     """
+    # ... keep existing code (prompt creation)
     # Extract prompt template and query examples from the incoming databaseInfo
     prompt_template = database_info.get('promptTemplate', '')
     query_examples = database_info.get('queryExamples', '')

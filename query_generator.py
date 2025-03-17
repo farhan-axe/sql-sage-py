@@ -62,6 +62,7 @@ Output Rules:
 18. **CRITICAL: ALL table references MUST follow the pattern [DATABASE_NAME].[SCHEMA_NAME].[TABLE_NAME], where DATABASE_NAME is the current database name.**
 19. **Never omit the database name and schema in table references - always use the full three-part naming convention.**
 20. **Always use square brackets around database name, schema and table names to handle special characters and spaces correctly: [DATABASE_NAME].[SCHEMA_NAME].[TABLE_NAME]**
+21. **DO NOT use table column names as schema names - look at the schema provided to determine the correct schema name (usually 'dbo').**
 """
 
         # Build the prompt using a triple-quoted f-string.
@@ -100,7 +101,7 @@ User Question: {request['question']}
                 detail="No SQL query found in the model's response."
             )
             
-        # Make sure all table references use the proper format
+        # Make sure all table references use the proper format with improved schema handling
         processed_query = formatQueryWithDatabasePrefix(query, database_name)
 
         logger.info(f"✅ Generated SQL Query: {processed_query}")

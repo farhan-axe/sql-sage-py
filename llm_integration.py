@@ -1,127 +1,122 @@
 
-import re
 import logging
+import re
 import requests
 import os
-from typing import Optional, Tuple
+from typing import Tuple, Optional, List, Dict, Any
 
 # Configure logging
-logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Constants
-OLLAMA_URL = "http://localhost:11434/api/generate"  # Ollama API endpoint
-MODEL = os.getenv("OLLAMA_MODEL", "deepseek-r1:8b")
-
 def query_ollama(prompt: str) -> str:
-    """Send a request to the Ollama server for SQL generation."""
-    payload = {"model": MODEL, "prompt": prompt, "stream": False, "temperature": 0.2}
+    """Send a prompt to the Ollama API and get a response."""
+    OLLAMA_URL = "http://localhost:11434/api/generate"
+    MODEL = os.getenv("OLLAMA_MODEL", "deepseek-r1:8b")
+    
+    payload = {
+        "model": MODEL,
+        "prompt": prompt,
+        "stream": False,
+        "temperature": 0.2
+    }
+    
     try:
-        logger.debug(f"Querying Ollama model: {MODEL}")
         response = requests.post(OLLAMA_URL, json=payload)
         response.raise_for_status()
         response_data = response.json()
-        logger.debug("Received response from Ollama")
         return response_data.get("response", "").strip()
     except requests.RequestException as e:
-        logger.error(f"❌ Error querying Ollama: {str(e)}")
-        return f"Error connecting to Ollama: {str(e)}"
+        logger.error(f"Error querying Ollama: {str(e)}")
+        return ""
 
 def extract_sql_from_response(response_text: str) -> Tuple[Optional[str], Optional[str]]:
-    """Extract the final SQL query and the AI's thought process from the model's response."""
-    # Extract the chain-of-thought (if any) for debugging.
-    think_match = re.search(r"<think>(.*?)</think>", response_text, flags=re.DOTALL)
-    think_text = think_match.group(1).strip() if think_match else None
-
-    # If there is a </think> tag, consider only the text after it.
-    if think_match:
-        post_think_text = response_text[think_match.end():]
-    else:
-        post_think_text = response_text
-
-    # Check if the response indicates a non-SQL question
-    non_sql_indicators = [
-        "i'm sorry",
-        "i am sorry",
-        "i cannot",
-        "i can't",
-        "cannot generate",
-        "can't generate",
-        "unable to generate",
-        "doesn't appear to be",
-        "does not appear to be",
-        "not related to",
-        "not a database",
-        "not database",
-        "no relevant data",
-        "no database",
-        "data is not available",
-        "outside the scope"
-    ]
+    """Extract SQL query from a model response."""
+    if not response_text:
+        return None, "Empty response from model"
     
-    # Check if response contains non-SQL indicators
-    for indicator in non_sql_indicators:
-        if indicator.lower() in post_think_text.lower():
-            logger.warning(f"Detected non-SQL response: '{indicator}' found in text")
-            return None, think_text
-
-    # Find all SQL code blocks in the considered text.
-    sql_matches = re.findall(r"```sql\s*(.*?)\s*```", post_think_text, flags=re.DOTALL)
+    # Try to extract SQL code blocks
+    sql_match = re.search(r"```sql\s*([\s\S]*?)\s*```", response_text, re.DOTALL)
+    if sql_match:
+        query = sql_match.group(1).strip()
+        if query:
+            return query, None
     
-    # If no SQL code blocks found, try to find a SELECT statement
-    if not sql_matches:
-        # Look for SELECT statements
-        select_match = re.search(r"(SELECT\s+.*?)(;|$)", post_think_text, flags=re.DOTALL | re.IGNORECASE)
-        if select_match:
-            query = select_match.group(1).strip()
-            logger.debug(f"Extracted SELECT statement: {query[:50]}...")
-            return query, think_text
-        logger.warning("No SQL code blocks or SELECT statements found")
-        return None, think_text
-    
-    # Return the last SQL code block if any are found.
-    query = sql_matches[-1].strip()
-    logger.debug(f"Extracted SQL from code block: {query[:50]}...")
-    return query, think_text
-
-def refine_sql_with_feedback(sql: str, error_msg: str) -> str:
-    """Refine SQL query based on error feedback and return only the refined SQL."""
-    feedback_prompt = f"""
-    The following SQL query failed to execute:
-
-    ```sql
-    {sql}
-    ```
-
-    The error message returned was:
-    "{error_msg}"
-
-    Please generate only the corrected SQL query with no additional explanation or comments.
-    """
-    logger.debug(f"Refining SQL with error feedback: {error_msg}")
-    refined_sql_response = query_ollama(feedback_prompt)
-    refined_sql, _ = extract_sql_from_response(refined_sql_response)
-    if not refined_sql:
-        logger.warning("Failed to extract refined SQL from response")
-        return sql  # Return original if no refinement could be extracted
-    logger.debug(f"SQL refined successfully: {refined_sql[:50]}...")
-    return refined_sql
-
-def formatQueryWithDatabasePrefix(query: str, databaseName: str) -> str:
-    """
-    Formats a query with the database prefix for tables that don't have it.
-    """
-    if not databaseName:
-        return query
-
-    # This regex identifies table references without the database.dbo prefix
-    table_regex = r'\b(FROM|JOIN)\s+(?!\[?[\w]+\]?\.\[?[\w]+\]?\.\[?)([\w\[\]]+)'
-    
-    # Replace them with properly formatted references
-    def replace_table_ref(match):
-        clause = match.group(1)  # FROM or JOIN
-        table = match.group(2).strip('[]')  # Table name without brackets
-        return f"{clause} [{databaseName}].[dbo].[{table}]"
+    # Try to find SQL-like patterns if no code block was found
+    if re.search(r"\bSELECT\b", response_text, re.IGNORECASE):
+        lines = response_text.split("\n")
+        sql_lines = []
+        in_query = False
+        
+        for line in lines:
+            line = line.strip()
+            if re.match(r"\bSELECT\b", line, re.IGNORECASE):
+                in_query = True
             
-    # Apply the regex substitution, with case insensitivity
-    return re.sub(table_regex, replace_table_ref, query, flags=re.IGNORECASE)
+            if in_query:
+                sql_lines.append(line)
+                if ";" in line:
+                    break
+        
+        if sql_lines:
+            query = " ".join(sql_lines).strip()
+            if query.endswith(";"):
+                query = query[:-1]  # Remove trailing semicolon
+            return query, None
+    
+    # If we couldn't extract a SQL query, return an error
+    return None, "No SQL query found in the response"
+
+def formatQueryWithDatabasePrefix(query: str, database_name: str) -> str:
+    """
+    Format a query to ensure all table references use the proper [DATABASE].[SCHEMA].[TABLE] format.
+    This is especially important to prevent table column definitions from being used as schema names.
+    """
+    if not query or not database_name:
+        return query
+    
+    # First, check if we have a schema that looks like column definitions 
+    # (indicating a schema parsing error)
+    schema_pattern = r'\[([^]]+)\]\.\[([^]]+)\]'
+    schemas = re.findall(schema_pattern, query)
+    
+    # Process FROM and JOIN table references
+    # This regex looks for table references in various formats
+    table_pattern = r'\b(FROM|JOIN)\s+(?:\[?([^\s\[\]]+)\]?\.)?(?:\[?([^\s\[\]]+)\]?\.)?(?:\[?([^\s\[\](),;]+)\]?)'
+    
+    def replace_table_ref(match):
+        """Replace table references with proper 3-part names with schema validation"""
+        clause = match.group(1)  # FROM or JOIN
+        first_part = match.group(2)  # Could be database or schema
+        second_part = match.group(3)  # Could be schema or table
+        third_part = match.group(4)  # Should be table
+        
+        # Check if any part looks like column definitions (containing spaces or data types)
+        possible_column_def = any(part and re.search(r'\s|int|varchar|char|datetime|nvarchar|text|bit|float', part, re.IGNORECASE) 
+                                for part in [first_part, second_part, third_part] if part)
+        
+        if possible_column_def:
+            # Assume dbo schema if we detect column definitions being used as schema
+            return f"{clause} [{database_name}].[dbo].[{third_part}]"
+        
+        if first_part and second_part and third_part:
+            # Already has a 3-part name, ensure database is correct
+            return f"{clause} [{database_name}].[{second_part}].[{third_part}]"
+        elif second_part and third_part:
+            # Has schema.table format
+            return f"{clause} [{database_name}].[{second_part}].[{third_part}]"
+        elif first_part and third_part:
+            # Has database.table format (missing schema)
+            return f"{clause} [{database_name}].[dbo].[{third_part}]"
+        elif third_part:
+            # Just has table name
+            return f"{clause} [{database_name}].[dbo].[{third_part}]"
+        else:
+            # Something went wrong, return the original
+            logger.warning(f"Unable to parse table reference: {match.group(0)}")
+            return match.group(0)
+    
+    # Apply the replacement
+    formatted_query = re.sub(table_pattern, replace_table_ref, query, flags=re.IGNORECASE)
+    
+    return formatted_query
