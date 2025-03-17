@@ -63,6 +63,7 @@ Output Rules:
 19. **Never omit the database name and schema in table references - always use the full three-part naming convention.**
 20. **Always use square brackets around database name, schema and table names to handle special characters and spaces correctly: [DATABASE_NAME].[SCHEMA_NAME].[TABLE_NAME]**
 21. **DO NOT use table column names as schema names - look at the schema provided to determine the correct schema name (usually 'dbo').**
+22. **IMPORTANT: When you see schema information in the format 'ID int, DirectoryName nvarchar, CreatedDate datetime', this is COLUMN INFORMATION, not schema name. The schema name is typically 'dbo'.**
 """
 
         # Build the prompt using a triple-quoted f-string.
@@ -81,14 +82,15 @@ You MUST format all table references with full three-part names: [DATABASE_NAME]
 - DATABASE_NAME is the current database name which is: {database_name}
 - SCHEMA_NAME should be taken from the table definition in the schema above (not assumed)
 - TABLE_NAME should exactly match what's in the schema
+- NEVER use column definitions like 'ID int, DirectoryName nvarchar' as schema names - these are column definitions, not schema names
 
 User Question: {request['question']}
 """
 
         response_text = query_ollama(prompt)
         
-        print(f"Prompt:\n{prompt}")
-        print("\nRaw Ollama response:\n", response_text, "\n")
+        logger.info(f"Prompt:\n{prompt}")
+        logger.info("\nRaw Ollama response:\n" + response_text + "\n")
 
         if not response_text:
             raise HTTPException(status_code=500, detail="Failed to get a response from the model.")

@@ -75,38 +75,59 @@ def formatQueryWithDatabasePrefix(query: str, database_name: str) -> str:
     if not query or not database_name:
         return query
     
-    # First, check if we have a schema that looks like column definitions 
-    # (indicating a schema parsing error)
-    schema_pattern = r'\[([^]]+)\]\.\[([^]]+)\]'
-    schemas = re.findall(schema_pattern, query)
+    # Log the original query for debugging
+    logger.info(f"Original query: {query}")
     
-    # Process FROM and JOIN table references
-    # This regex looks for table references in various formats
-    table_pattern = r'\b(FROM|JOIN)\s+(?:\[?([^\s\[\]]+)\]?\.)?(?:\[?([^\s\[\]]+)\]?\.)?(?:\[?([^\s\[\](),;]+)\]?)'
+    # Check for common SQL data types that would indicate a schema name is actually a column definition
+    sql_data_types = r'int|bigint|varchar|nvarchar|char|nchar|text|datetime|date|time|bit|float|decimal|money|real|smallint|tinyint|uniqueidentifier|xml|image|binary|varbinary|timestamp|geography|geometry'
+    
+    # Process FROM and JOIN table references with a more robust pattern
+    table_pattern = r'\b(FROM|JOIN)\s+(?:\[?([^\s\[\].,)]+)\]?\.)?(?:\[?([^\s\[\].,)]+)\]?\.)?(?:\[?([^\s\[\].,);]+)\]?)'
     
     def replace_table_ref(match):
-        """Replace table references with proper 3-part names with schema validation"""
+        """Replace table references with proper 3-part names with improved schema validation"""
         clause = match.group(1)  # FROM or JOIN
         first_part = match.group(2)  # Could be database or schema
         second_part = match.group(3)  # Could be schema or table
         third_part = match.group(4)  # Should be table
         
-        # Check if any part looks like column definitions (containing spaces or data types)
-        possible_column_def = any(part and re.search(r'\s|int|varchar|char|datetime|nvarchar|text|bit|float', part, re.IGNORECASE) 
-                                for part in [first_part, second_part, third_part] if part)
+        # Log what we found for debugging
+        logger.debug(f"Found table reference: {match.group(0)}")
+        logger.debug(f"  - Clause: {clause}")
+        logger.debug(f"  - First part: {first_part}")
+        logger.debug(f"  - Second part: {second_part}")
+        logger.debug(f"  - Third part: {third_part}")
         
-        if possible_column_def:
-            # Assume dbo schema if we detect column definitions being used as schema
+        # If any part contains SQL data types, it's likely a column definition
+        # This is a strong indicator that the model confused column definitions for schema names
+        contains_data_type = False
+        for part in [first_part, second_part]:
+            if part and re.search(sql_data_types, part, re.IGNORECASE):
+                logger.warning(f"Detected SQL data type in schema name: '{part}' - this is likely a column definition")
+                contains_data_type = True
+                break
+        
+        # If any part contains spaces, commas, or parentheses (after stripping brackets), it's not a valid schema/table name
+        is_valid_schema = True
+        for part in [first_part, second_part]:
+            if part and (re.search(r'[\s,()]', part) or len(part) > 128):
+                logger.warning(f"Invalid schema/database part detected: '{part}'")
+                is_valid_schema = False
+                break
+        
+        # Replace with proper format if we detect it's using column definitions or has invalid schema names
+        if contains_data_type or not is_valid_schema:
             return f"{clause} [{database_name}].[dbo].[{third_part}]"
         
+        # Handle different table reference formats
         if first_part and second_part and third_part:
-            # Already has a 3-part name, ensure database is correct
+            # Already has 3-part name, ensure database is correct
             return f"{clause} [{database_name}].[{second_part}].[{third_part}]"
         elif second_part and third_part:
             # Has schema.table format
             return f"{clause} [{database_name}].[{second_part}].[{third_part}]"
         elif first_part and third_part:
-            # Has database.table format (missing schema)
+            # Has database.table format (missing schema), use dbo schema
             return f"{clause} [{database_name}].[dbo].[{third_part}]"
         elif third_part:
             # Just has table name
@@ -118,5 +139,8 @@ def formatQueryWithDatabasePrefix(query: str, database_name: str) -> str:
     
     # Apply the replacement
     formatted_query = re.sub(table_pattern, replace_table_ref, query, flags=re.IGNORECASE)
+    
+    # Log the formatted query for debugging
+    logger.info(f"Formatted query: {formatted_query}")
     
     return formatted_query
