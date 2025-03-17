@@ -186,7 +186,7 @@ def parse_database(server, database, use_windows_auth, credentials=None):
                 }
             }
 
-        # Generate example queries based on the schema - dynamically, without any numbering
+        # Generate example queries based on the schema - fully dynamically
         query_examples = generate_example_queries(db_name, tables)
         
         return {
@@ -211,25 +211,25 @@ def parse_database(server, database, use_windows_auth, credentials=None):
 def generate_example_queries(database_name, tables):
     """
     Generates example SQL queries based on the database schema.
-    All examples are dynamically generated based on the actual schema, without example numbers.
+    All examples are dynamically generated based on the actual schema.
     """
     if not tables:
         return "No tables available to generate examples."
     
     examples = "Below are some general examples of questions:\n\n"
     
-    # For each table, generate a count query (without numbering)
-    for table in tables[:10]:  # Limit to 10 tables for brevity
+    # For each table, generate a count query
+    for i, table in enumerate(tables[:20], 1):  # Limit to 20 tables for brevity
         table_name = table["displayName"]
         full_table_name = table["fullName"]
         
-        examples += f"Calculate the total number of records in {table_name}?,\n"
+        examples += f"{i}. Calculate the total number of records in {table_name}?,\n"
         examples += f"Your SQL Query will be like \"SELECT COUNT(*) AS TotalRecords FROM {full_table_name};\"\n\n"
     
-    # Add more complex examples if there are multiple tables (without numbering)
+    # Add more complex examples if there are multiple tables
     if len(tables) >= 2:
         # Add a SELECT TOP example
-        examples += f"Show me the top 10 records from {tables[0]['displayName']}?,\n"
+        examples += f"{len(tables[:20]) + 1}. Show me the top 10 records from {tables[0]['displayName']}?,\n"
         examples += f"Your SQL Query will be like \"SELECT TOP 10 * FROM {tables[0]['fullName']};\"\n\n"
         
         # Try to find two tables that might be related
@@ -272,16 +272,15 @@ def generate_example_queries(database_name, tables):
         
         if join_col1 and join_col2:
             # Add JOIN example
-            examples += f"Join {table1['displayName']} with {table2['displayName']}?,\n"
+            examples += f"{len(tables[:20]) + 2}. Join {table1['displayName']} with {table2['displayName']}?,\n"
             examples += f"Your SQL Query will be like \"SELECT t1.*, t2.*\nFROM {table1['fullName']} t1\nJOIN {table2['fullName']} t2 ON t1.{join_col1} = t2.{join_col2};\"\n\n"
         
         # Add GROUP BY example if we can find a good column
         for table in tables[:2]:
             for col in table["columns"]:
                 if col["type"].lower() in ["varchar", "nvarchar", "char", "nchar"]:
-                    examples += f"Group records in {table['displayName']} by {col['name']}?,\n"
+                    examples += f"{len(tables[:20]) + 3}. Group records in {table['displayName']} by {col['name']}?,\n"
                     examples += f"Your SQL Query will be like \"SELECT {col['name']}, COUNT(*) AS Count\nFROM {table['fullName']}\nGROUP BY {col['name']}\nORDER BY Count DESC;\"\n\n"
                     break
     
     return examples
-

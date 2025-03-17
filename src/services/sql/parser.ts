@@ -144,15 +144,16 @@ export const parseDatabase = async (
           }
           
           // Use the fullName when available, otherwise construct it
-          // Make sure to use schemaName as the schema part of the FROM clause (not columns)
           const fullTableName = table.fullName || `[${database}].[${schemaName}].[${table.name}]`;
           promptTemplate += `FROM ${fullTableName};\n\n`;
           promptTemplate += `Primary Key: ${primaryKey}\n\n`;
         }
       });
       
-      // Get query examples from the backend directly
-      const queryExamples = data.queryExamples || "";
+      // Let the backend generate query examples based on the tables data
+      // This ensures examples are dynamically generated
+      const queryExamples = data.queryExamples || generateQueryExamples(tables, database);
+      console.log("Generated query examples:", queryExamples.substring(0, 200) + "...");
       
       // Return the correctly mapped data
       return {
