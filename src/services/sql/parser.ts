@@ -122,12 +122,12 @@ export const parseDatabase = async (
             table.columns.forEach((column: any, index: number) => {
               // Format column information
               const columnName = typeof column === 'string' ? column : column.name;
-              const columnType = column.type ? ` /* ${column.type} */` : '';
+              const columnType = column.type ? ` ${column.type}` : '';
               const isPK = column.isPrimaryKey ? ' /* Primary Key */' : '';
               
               // Add commas after each column except the last one
               if (index < table.columns.length - 1) {
-                promptTemplate += `${columnName}${columnType}${isPK},\n`;
+                promptTemplate += `${columnName}${columnType},${isPK}\n`;
               } else {
                 promptTemplate += `${columnName}${columnType}${isPK}\n`;
               }
@@ -150,8 +150,9 @@ export const parseDatabase = async (
         }
       });
       
-      // Generate query examples based on the tables data
-      const queryExamples = generateQueryExamples(tables, database);
+      // Let the backend generate query examples based on the tables data
+      // This ensures examples are dynamically generated
+      const queryExamples = data.queryExamples || generateQueryExamples(tables, database);
       console.log("Generated query examples:", queryExamples.substring(0, 200) + "...");
       
       // Return the correctly mapped data

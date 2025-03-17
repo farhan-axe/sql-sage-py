@@ -84,7 +84,7 @@ def parse_database(server, database, use_windows_auth, credentials=None):
         cnxn = pyodbc.connect(conn_str)
         cursor = cnxn.cursor()
         
-        # First, get the default schema for the database
+        # First, get all schemas for the database
         cursor.execute("""
             SELECT SCHEMA_NAME
             FROM INFORMATION_SCHEMA.SCHEMATA
@@ -144,6 +144,9 @@ def parse_database(server, database, use_windows_auth, credentials=None):
             
             if current_table is None or current_table["name"] != table_name or current_table["schema"] != schema_name:
                 if current_table is not None:
+                    # Find primary key columns for the current table
+                    primary_keys = [col["name"] for col in current_table["columns"] if col.get("isPrimaryKey")]
+                    current_table["primaryKey"] = ", ".join(primary_keys) if primary_keys else "None defined"
                     tables.append(current_table)
                 
                 current_table = {
@@ -164,6 +167,9 @@ def parse_database(server, database, use_windows_auth, credentials=None):
             prompt_template += f"  - {column_name} ({data_type}){' (PK)' if is_primary_key == 'YES' else ''}\n"
         
         if current_table is not None:
+            # Find primary key columns for the last table
+            primary_keys = [col["name"] for col in current_table["columns"] if col.get("isPrimaryKey")]
+            current_table["primaryKey"] = ", ".join(primary_keys) if primary_keys else "None defined"
             tables.append(current_table)
 
         # If no tables were found
@@ -180,7 +186,7 @@ def parse_database(server, database, use_windows_auth, credentials=None):
                 }
             }
 
-        # Generate example queries based on the schema
+        # Generate example queries based on the schema - fully dynamically
         query_examples = generate_example_queries(db_name, tables)
         
         return {
@@ -205,6 +211,7 @@ def parse_database(server, database, use_windows_auth, credentials=None):
 def generate_example_queries(database_name, tables):
     """
     Generates example SQL queries based on the database schema.
+    All examples are dynamically generated based on the actual schema.
     """
     if not tables:
         return "No tables available to generate examples."
