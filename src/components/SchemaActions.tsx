@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { DatabaseInfo } from "@/types/database";
 import { embedSchema } from "@/services/sql/parser";
-import { Database, Server, Vector } from "lucide-react";
+import { Database, Server, Braces } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface SchemaActionsProps {
@@ -67,12 +67,12 @@ const SchemaActions = ({ databaseInfo, isConnected }: SchemaActionsProps) => {
             >
               {isLoading ? (
                 <>
-                  <Vector className="h-4 w-4 animate-pulse" />
+                  <Braces className="h-4 w-4 animate-pulse" />
                   Creating...
                 </>
               ) : (
                 <>
-                  <Vector className="h-4 w-4" />
+                  <Braces className="h-4 w-4" />
                   Create Vector Database
                 </>
               )}
