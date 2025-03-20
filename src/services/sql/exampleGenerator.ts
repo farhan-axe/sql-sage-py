@@ -28,8 +28,8 @@ export function generateQueryExamples(tables: any[], dbName: string = ""): strin
   // First, generate count examples for each table
   sortedTables.forEach((table, index) => {
     if (table.name) {
-      // Use tableSchema if available, otherwise fallback to schema property or 'dbo'
-      const schemaName = table.tableSchema || (table.schema && typeof table.schema !== 'object' ? table.schema : 'dbo');
+      // Use tableSchema consistently
+      const schemaName = table.tableSchema || 'dbo';
       const fullTableName = table.fullName || `[${dbName}].[${schemaName}].[${table.name}]`;
       const displayName = table.displayName || table.name;
       
@@ -48,8 +48,8 @@ export function generateQueryExamples(tables: any[], dbName: string = ""): strin
   
   if (exampleTables.length >= 1) {
     const table = exampleTables[0];
-    // Use tableSchema if available, otherwise fallback
-    const schemaName = table.tableSchema || (table.schema && typeof table.schema !== 'object' ? table.schema : 'dbo');
+    // Use tableSchema consistently
+    const schemaName = table.tableSchema || 'dbo';
     const fullTableName = table.fullName || `[${dbName}].[${schemaName}].[${table.name}]`;
     const displayName = table.displayName || table.name;
     
@@ -62,9 +62,9 @@ export function generateQueryExamples(tables: any[], dbName: string = ""): strin
     const table1 = exampleTables[0];
     const table2 = exampleTables[1];
     
-    // Use tableSchema if available for both tables
-    const schema1 = table1.tableSchema || (table1.schema && typeof table1.schema !== 'object' ? table1.schema : 'dbo');
-    const schema2 = table2.tableSchema || (table2.schema && typeof table2.schema !== 'object' ? table2.schema : 'dbo');
+    // Use tableSchema consistently for both tables
+    const schema1 = table1.tableSchema || 'dbo';
+    const schema2 = table2.tableSchema || 'dbo';
     
     const fullTableName1 = table1.fullName || `[${dbName}].[${schema1}].[${table1.name}]`;
     const fullTableName2 = table2.fullName || `[${dbName}].[${schema2}].[${table2.name}]`;
@@ -145,8 +145,8 @@ export function generateQueryExamples(tables: any[], dbName: string = ""): strin
   
   if (exampleTables.length >= 1) {
     const table = exampleTables[0];
-    // Use tableSchema if available
-    const schemaName = table.tableSchema || (table.schema && typeof table.schema !== 'object' ? table.schema : 'dbo');
+    // Use tableSchema consistently
+    const schemaName = table.tableSchema || 'dbo';
     const fullTableName = table.fullName || `[${dbName}].[${schemaName}].[${table.name}]`;
     const displayName = table.displayName || table.name;
     
@@ -197,8 +197,8 @@ export function generateQueryExamples(tables: any[], dbName: string = ""): strin
   // Add a filter example
   if (exampleTables.length >= 1) {
     const table = exampleTables[0];
-    // Use tableSchema if available
-    const schemaName = table.tableSchema || (table.schema && typeof table.schema !== 'object' ? table.schema : 'dbo');
+    // Use tableSchema consistently
+    const schemaName = table.tableSchema || 'dbo';
     const fullTableName = table.fullName || `[${dbName}].[${schemaName}].[${table.name}]`;
     const displayName = table.displayName || table.name;
     
