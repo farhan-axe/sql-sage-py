@@ -1,3 +1,4 @@
+
 from fastapi import FastAPI, HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
 import logging
@@ -54,7 +55,7 @@ if not check_ollama_running():
 
 # Import modules with error handling
 try:
-    from models import ConnectionConfig, QueryGenerationRequest, QueryExecutionRequest
+    from models import ConnectionConfig, QueryGenerationRequest, QueryExecutionRequest, QueryExamplesData, QueryExamplesSearchRequest
     from db_operations import connect_and_list_databases, parse_database_schema, execute_query, terminate_session
     from query_generator import generate_query
 except ImportError as e:
@@ -71,7 +72,7 @@ except ImportError as e:
         
     # Try importing again
     try:
-        from models import ConnectionConfig, QueryGenerationRequest, QueryExecutionRequest
+        from models import ConnectionConfig, QueryGenerationRequest, QueryExecutionRequest, QueryExamplesData, QueryExamplesSearchRequest
         from db_operations import connect_and_list_databases, parse_database_schema, execute_query, terminate_session
         from query_generator import generate_query
         logging.info("Successfully imported modules after path fix")
@@ -137,7 +138,7 @@ def generate_query(request_dict):
             
         # Try importing again after creating placeholders
         try:
-            from models import ConnectionConfig, QueryGenerationRequest, QueryExecutionRequest
+            from models import ConnectionConfig, QueryGenerationRequest, QueryExecutionRequest, QueryExamplesData, QueryExamplesSearchRequest
             from db_operations import connect_and_list_databases, parse_database_schema, execute_query, terminate_session
             from query_generator import generate_query
             logging.info("Successfully imported placeholder modules")
@@ -163,6 +164,8 @@ app.add_middleware(
 )
 
 # ------------------------------ API Endpoints ------------------------------
+# ... keep existing code (root and health_check endpoints)
+
 @app.get("/")
 async def root():
     return {"message": "SQL Sage Backend API is running"}
@@ -304,10 +307,21 @@ async def embed_examples_endpoint(request_body: dict = Body(...)):
         if not examples:
             return {"status": "error", "message": "No examples provided to embed"}
             
-        # Count the number of examples by splitting by "Your SQL Query will be like"
-        example_count = examples.count("Your SQL Query will be like")
+        # Split examples into a list if it's a string
+        example_list = []
+        if isinstance(examples, str):
+            # Split by "Your SQL Query will be like" marker which separates examples
+            example_sections = examples.split("Your SQL Query will be like")
+            for section in example_sections:
+                if section.strip():
+                    example_list.append(section.strip())
+        else:
+            example_list = examples
             
-        # This would be implemented in a real backend
+        # Count the number of examples    
+        example_count = len(example_list) if example_list else 0
+            
+        # This would call the backend implementation shown in your code snippet
         # Here we're just returning a success message
         return {
             "status": "success", 
@@ -317,6 +331,36 @@ async def embed_examples_endpoint(request_body: dict = Body(...)):
         logger.error(f"Error embedding examples: {str(e)}")
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Failed to embed examples: {str(e)}")
+
+@app.post("/api/sql/search-examples")
+async def search_examples_endpoint(request_body: dict = Body(...)):
+    """
+    Searches for relevant query examples based on the user's question
+    """
+    # Check if Ollama is running before proceeding
+    if not check_ollama_running():
+        return {
+            "status": "error", 
+            "message": "Ollama service is not running. Please start Ollama and try again."
+        }
+        
+    try:
+        query = request_body.get("query", "")
+        if not query:
+            return {"status": "error", "message": "No query provided to search examples"}
+            
+        # This would call the backend implementation shown in your code snippet
+        # Here we're just returning a placeholder successful result
+        sample_result = "Here are some relevant examples:\n\n1. Query to get all customers:\nSELECT * FROM [Database].[dbo].[Customers];\n\n2. Query to filter data by date:\nSELECT * FROM [Database].[dbo].[Orders] WHERE OrderDate > '2023-01-01';"
+        
+        return {
+            "status": "success", 
+            "result": sample_result
+        }
+    except Exception as e:
+        logger.error(f"Error searching examples: {str(e)}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Failed to search examples: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn

@@ -45,3 +45,10 @@ class QueryRefinementAttempt(BaseModel):
     query: str
     error: Optional[str] = None
     response: Optional[str] = None
+
+class QueryExamplesData(BaseModel):
+    examples: List[str]
+    database: Optional[str] = None
+
+class QueryExamplesSearchRequest(BaseModel):
+    query: str

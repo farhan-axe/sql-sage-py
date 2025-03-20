@@ -1,4 +1,3 @@
-
 /**
  * Functions for parsing SQL database schema
  */
@@ -238,13 +237,22 @@ export const embedExamples = async (databaseInfo: DatabaseInfo): Promise<{ succe
       };
     }
     
+    // Parse examples from the string into array for better server handling
+    const examplesText = databaseInfo.queryExamples;
+    const exampleSections = examplesText.split("Your SQL Query will be like");
+    const examples = exampleSections
+      .map(section => section.trim())
+      .filter(section => section.length > 0);
+      
+    console.log(`Parsed ${examples.length} examples from text`);
+    
     const response = await fetch('http://localhost:3001/api/sql/embed-examples', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        examples: databaseInfo.queryExamples,
+        examples: examples.length > 0 ? examples : examplesText,
         database: databaseInfo.connectionConfig.database
       }),
     });
@@ -294,6 +302,36 @@ export const searchSchema = async (query: string): Promise<string> => {
     return result.result || "";
   } catch (error) {
     console.error("Error searching schema:", error);
+    throw error;
+  }
+};
+
+/**
+ * Searches the examples vectorstore for relevant query examples
+ * @param query The natural language query to search for in examples
+ * @returns Promise that resolves to the relevant examples
+ */
+export const searchQueryExamples = async (query: string): Promise<string> => {
+  try {
+    const response = await fetch('http://localhost:3001/api/sql/search-examples', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        query
+      }),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+    }
+    
+    const result = await response.json();
+    return result.result || "";
+  } catch (error) {
+    console.error("Error searching query examples:", error);
     throw error;
   }
 };
