@@ -3,8 +3,8 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { DatabaseInfo } from "@/types/database";
-import { embedSchema } from "@/services/sql/parser";
-import { Database, Server, Braces } from "lucide-react";
+import { embedSchema, embedExamples } from "@/services/sql/parser";
+import { Database, BookOpen, Braces } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface SchemaActionsProps {
@@ -14,7 +14,8 @@ interface SchemaActionsProps {
 
 const SchemaActions = ({ databaseInfo, isConnected }: SchemaActionsProps) => {
   const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingSchema, setIsLoadingSchema] = useState(false);
+  const [isLoadingExamples, setIsLoadingExamples] = useState(false);
 
   const handleCreateVectorDb = async () => {
     if (!databaseInfo || !databaseInfo.tables || databaseInfo.tables.length === 0) {
@@ -26,7 +27,7 @@ const SchemaActions = ({ databaseInfo, isConnected }: SchemaActionsProps) => {
       return;
     }
 
-    setIsLoading(true);
+    setIsLoadingSchema(true);
     try {
       const result = await embedSchema(databaseInfo);
       
@@ -50,7 +51,45 @@ const SchemaActions = ({ databaseInfo, isConnected }: SchemaActionsProps) => {
         variant: "destructive",
       });
     } finally {
-      setIsLoading(false);
+      setIsLoadingSchema(false);
+    }
+  };
+
+  const handleEmbedExamples = async () => {
+    if (!databaseInfo || !databaseInfo.queryExamples) {
+      toast({
+        title: "No query examples available",
+        description: "Please connect to a database with examples first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsLoadingExamples(true);
+    try {
+      const result = await embedExamples(databaseInfo);
+      
+      if (result.success) {
+        toast({
+          title: "Query examples embedded",
+          description: result.message,
+        });
+      } else {
+        toast({
+          title: "Error embedding examples",
+          description: result.message,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error embedding query examples:", error);
+      toast({
+        title: "Error embedding examples",
+        description: error instanceof Error ? error.message : "Unknown error",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingExamples(false);
     }
   };
 
@@ -62,10 +101,10 @@ const SchemaActions = ({ databaseInfo, isConnected }: SchemaActionsProps) => {
             <Button
               variant="outline"
               onClick={handleCreateVectorDb}
-              disabled={!isConnected || isLoading || !databaseInfo?.tables.length}
+              disabled={!isConnected || isLoadingSchema || !databaseInfo?.tables.length}
               className="flex items-center gap-2"
             >
-              {isLoading ? (
+              {isLoadingSchema ? (
                 <>
                   <Braces className="h-4 w-4 animate-pulse" />
                   Creating...
@@ -73,13 +112,41 @@ const SchemaActions = ({ databaseInfo, isConnected }: SchemaActionsProps) => {
               ) : (
                 <>
                   <Braces className="h-4 w-4" />
-                  Create Vector Database
+                  Create Schema Vector
                 </>
               )}
             </Button>
           </TooltipTrigger>
           <TooltipContent>
             <p>Create vector embeddings for schema to improve query generation</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="outline"
+              onClick={handleEmbedExamples}
+              disabled={!isConnected || isLoadingExamples || !databaseInfo?.queryExamples}
+              className="flex items-center gap-2"
+            >
+              {isLoadingExamples ? (
+                <>
+                  <BookOpen className="h-4 w-4 animate-pulse" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <BookOpen className="h-4 w-4" />
+                  Create Examples Vector
+                </>
+              )}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Create vector embeddings for query examples to improve query generation</p>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>

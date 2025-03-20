@@ -223,6 +223,52 @@ export const embedSchema = async (databaseInfo: DatabaseInfo): Promise<{ success
 };
 
 /**
+ * Creates vector embeddings from query examples for improved query generation
+ * @param databaseInfo The database information with query examples to embed
+ * @returns Promise that resolves when examples are successfully embedded
+ */
+export const embedExamples = async (databaseInfo: DatabaseInfo): Promise<{ success: boolean; message: string }> => {
+  try {
+    console.log("Creating vector embeddings for query examples");
+    
+    if (!databaseInfo.queryExamples) {
+      return {
+        success: false,
+        message: "No query examples available to embed"
+      };
+    }
+    
+    const response = await fetch('http://localhost:3001/api/sql/embed-examples', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        examples: databaseInfo.queryExamples,
+        database: databaseInfo.connectionConfig.database
+      }),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+    }
+    
+    const result = await response.json();
+    return { 
+      success: true, 
+      message: result.message || "Query examples embedded successfully" 
+    };
+  } catch (error) {
+    console.error("Error embedding examples:", error);
+    return { 
+      success: false, 
+      message: error instanceof Error ? error.message : "Unknown error embedding query examples" 
+    };
+  }
+};
+
+/**
  * Searches the schema vectorstore for relevant schema information
  * @param query The natural language query to search for in the schema
  * @returns Promise that resolves to the relevant schema parts
