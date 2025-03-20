@@ -3,7 +3,8 @@ export interface TableInfo {
   name: string;
   schema: string[];
   primaryKey: string;
-  example: string;
+  tableSchema?: string;
+  example?: string;
 }
 
 export interface ConnectionConfig {
@@ -83,4 +84,17 @@ export interface QueryInterfaceProps {
   onSessionTerminate: (success: boolean) => void;
   onSaveQuery?: (question: string, query: string) => void;
   onQueryGenerated?: (timeInMs: number) => void;
+}
+
+// New interfaces for vector schema operations
+export interface SchemaEmbeddingResponse {
+  message: string;
+}
+
+export interface SchemaSearchRequest {
+  query: string;
+}
+
+export interface SchemaSearchResponse {
+  result: string;
 }

@@ -111,7 +111,8 @@ export const parseDatabase = async (
       let promptTemplate = "Below is the database schema\n\n";
       tables.forEach((table: any) => {
         if (table.name) {
-          const schemaName = table.schema || 'dbo';
+          // Use tableSchema from the API response instead of hardcoded 'dbo'
+          const schemaName = table.tableSchema || 'dbo';
           const displayName = table.displayName || table.name;
           const primaryKey = table.primaryKey || 'None defined';
           
@@ -143,8 +144,8 @@ export const parseDatabase = async (
             });
           }
           
-          // Use the fullName when available, otherwise construct it
-          const fullTableName = table.fullName || `[${database}].[${schemaName}].[${table.name}]`;
+          // Use the tableSchema when available, otherwise construct it
+          const fullTableName = `[${database}].[${schemaName}].[${table.name}]`;
           promptTemplate += `FROM ${fullTableName};\n\n`;
           promptTemplate += `Primary Key: ${primaryKey}\n\n`;
         }
@@ -179,6 +180,74 @@ export const parseDatabase = async (
     if (error instanceof Error && error.name === 'AbortError') {
       throw new Error('Connection timed out after 60 seconds. Please check if the backend server is running at http://localhost:3001.');
     }
+    throw error;
+  }
+};
+
+/**
+ * Creates vector embeddings from database schema for improved query generation
+ * @param databaseInfo The database information with tables to embed
+ * @returns Promise that resolves when schema is successfully embedded
+ */
+export const embedSchema = async (databaseInfo: DatabaseInfo): Promise<{ success: boolean; message: string }> => {
+  try {
+    console.log("Creating vector embeddings for schema with tables:", databaseInfo.tables.length);
+    
+    const response = await fetch('http://localhost:3001/api/sql/embed-schema', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        tables: databaseInfo.tables
+      }),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+    }
+    
+    const result = await response.json();
+    return { 
+      success: true, 
+      message: result.message || "Vector database created successfully" 
+    };
+  } catch (error) {
+    console.error("Error embedding schema:", error);
+    return { 
+      success: false, 
+      message: error instanceof Error ? error.message : "Unknown error creating vector database" 
+    };
+  }
+};
+
+/**
+ * Searches the schema vectorstore for relevant schema information
+ * @param query The natural language query to search for in the schema
+ * @returns Promise that resolves to the relevant schema parts
+ */
+export const searchSchema = async (query: string): Promise<string> => {
+  try {
+    const response = await fetch('http://localhost:3001/api/sql/search-schema', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        query
+      }),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+    }
+    
+    const result = await response.json();
+    return result.result || "";
+  } catch (error) {
+    console.error("Error searching schema:", error);
     throw error;
   }
 };

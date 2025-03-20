@@ -101,23 +101,28 @@ def formatQueryWithDatabasePrefix(query: str, database_name: str) -> str:
         # If any part contains SQL data types, it's likely a column definition
         # This is a strong indicator that the model confused column definitions for schema names
         contains_data_type = False
-        for part in [first_part, second_part]:
-            if part and re.search(sql_data_types, part, re.IGNORECASE):
+        parts_to_check = [p for p in [first_part, second_part] if p]
+        
+        for part in parts_to_check:
+            if re.search(sql_data_types, part, re.IGNORECASE):
                 logger.warning(f"Detected SQL data type in schema name: '{part}' - this is likely a column definition")
                 contains_data_type = True
                 break
         
         # If any part contains spaces, commas, or parentheses (after stripping brackets), it's not a valid schema/table name
         is_valid_schema = True
-        for part in [first_part, second_part]:
-            if part and (re.search(r'[\s,()]', part) or len(part) > 128):
+        for part in parts_to_check:
+            if re.search(r'[\s,()]', part) or len(part) > 128:
                 logger.warning(f"Invalid schema/database part detected: '{part}'")
                 is_valid_schema = False
                 break
         
+        # Always use tableSchema if available in the query, otherwise default to 'dbo'
+        schema_name = 'dbo'
+        
         # Replace with proper format if we detect it's using column definitions or has invalid schema names
         if contains_data_type or not is_valid_schema:
-            return f"{clause} [{database_name}].[dbo].[{third_part}]"
+            return f"{clause} [{database_name}].[{schema_name}].[{third_part}]"
         
         # Handle different table reference formats
         if first_part and second_part and third_part:
@@ -128,10 +133,10 @@ def formatQueryWithDatabasePrefix(query: str, database_name: str) -> str:
             return f"{clause} [{database_name}].[{second_part}].[{third_part}]"
         elif first_part and third_part:
             # Has database.table format (missing schema), use dbo schema
-            return f"{clause} [{database_name}].[dbo].[{third_part}]"
+            return f"{clause} [{database_name}].[{schema_name}].[{third_part}]"
         elif third_part:
             # Just has table name
-            return f"{clause} [{database_name}].[dbo].[{third_part}]"
+            return f"{clause} [{database_name}].[{schema_name}].[{third_part}]"
         else:
             # Something went wrong, return the original
             logger.warning(f"Unable to parse table reference: {match.group(0)}")

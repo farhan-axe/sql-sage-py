@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import DatabaseConnection from "@/components/DatabaseConnection";
 import QueryInterface from "@/components/QueryInterface";
+import SchemaActions from "@/components/SchemaActions";
 import { DatabaseInfo } from "@/types/database";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
@@ -174,59 +175,67 @@ const Index = () => {
         />
 
         {isConnected && (
-          <div className="mt-6">
-            <Tabs defaultValue="schema" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="schema">Schema</TabsTrigger>
-                <TabsTrigger value="examples">Examples</TabsTrigger>
-              </TabsList>
-              <TabsContent value="schema" className="mt-2">
-                <ScrollArea className="h-[300px] rounded-md border p-4 bg-white">
-                  {databaseInfo?.promptTemplate ? (
-                    <>
-                      {isSchemaEmpty && (
-                        <Alert variant="destructive" className="mb-4 bg-amber-50 border-amber-200">
-                          <AlertTriangle className="h-4 w-4 text-amber-600" />
-                          <AlertTitle>No Database Schema Found</AlertTitle>
-                          <AlertDescription className="text-sm">
-                            The selected database appears to be empty or you may not have permission to access its tables.
-                          </AlertDescription>
-                        </Alert>
-                      )}
-                      <pre className="text-xs whitespace-pre-wrap">{databaseInfo.promptTemplate}</pre>
-                    </>
-                  ) : (
-                    <EmptyStateContent 
-                      icon={<DatabaseIcon className="h-12 w-12 text-gray-400 mb-4" />}
-                      message="Database schema will appear here after parsing. If schema is empty, the database might not have any tables or there was an error during parsing." 
-                    />
-                  )}
-                </ScrollArea>
-              </TabsContent>
-              <TabsContent value="examples" className="mt-2">
-                <ScrollArea className="h-[300px] rounded-md border p-4 bg-white">
-                  {databaseInfo?.queryExamples ? (
-                    <>
-                      {areExamplesEmpty && (
-                        <Alert variant="destructive" className="mb-4 bg-amber-50 border-amber-200">
-                          <AlertTriangle className="h-4 w-4 text-amber-600" />
-                          <AlertTitle>No Query Examples Available</AlertTitle>
-                          <AlertDescription className="text-sm">
-                            Cannot generate examples for an empty database. Try selecting a database with tables.
-                          </AlertDescription>
-                        </Alert>
-                      )}
-                      <pre className="text-xs markdown-content whitespace-pre-wrap">{databaseInfo.queryExamples}</pre>
-                    </>
-                  ) : (
-                    <EmptyStateContent 
-                      message="Query examples will appear here after parsing. Examples help you understand how to query the database." 
-                    />
-                  )}
-                </ScrollArea>
-              </TabsContent>
-            </Tabs>
-          </div>
+          <>
+            <div className="mt-6">
+              <Tabs defaultValue="schema" className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="schema">Schema</TabsTrigger>
+                  <TabsTrigger value="examples">Examples</TabsTrigger>
+                </TabsList>
+                <TabsContent value="schema" className="mt-2">
+                  <ScrollArea className="h-[300px] rounded-md border p-4 bg-white">
+                    {databaseInfo?.promptTemplate ? (
+                      <>
+                        {isSchemaEmpty && (
+                          <Alert variant="destructive" className="mb-4 bg-amber-50 border-amber-200">
+                            <AlertTriangle className="h-4 w-4 text-amber-600" />
+                            <AlertTitle>No Database Schema Found</AlertTitle>
+                            <AlertDescription className="text-sm">
+                              The selected database appears to be empty or you may not have permission to access its tables.
+                            </AlertDescription>
+                          </Alert>
+                        )}
+                        <pre className="text-xs whitespace-pre-wrap">{databaseInfo.promptTemplate}</pre>
+                      </>
+                    ) : (
+                      <EmptyStateContent 
+                        icon={<DatabaseIcon className="h-12 w-12 text-gray-400 mb-4" />}
+                        message="Database schema will appear here after parsing. If schema is empty, the database might not have any tables or there was an error during parsing." 
+                      />
+                    )}
+                  </ScrollArea>
+                </TabsContent>
+                <TabsContent value="examples" className="mt-2">
+                  <ScrollArea className="h-[300px] rounded-md border p-4 bg-white">
+                    {databaseInfo?.queryExamples ? (
+                      <>
+                        {areExamplesEmpty && (
+                          <Alert variant="destructive" className="mb-4 bg-amber-50 border-amber-200">
+                            <AlertTriangle className="h-4 w-4 text-amber-600" />
+                            <AlertTitle>No Query Examples Available</AlertTitle>
+                            <AlertDescription className="text-sm">
+                              Cannot generate examples for an empty database. Try selecting a database with tables.
+                            </AlertDescription>
+                          </Alert>
+                        )}
+                        <pre className="text-xs markdown-content whitespace-pre-wrap">{databaseInfo.queryExamples}</pre>
+                      </>
+                    ) : (
+                      <EmptyStateContent 
+                        message="Query examples will appear here after parsing. Examples help you understand how to query the database." 
+                      />
+                    )}
+                  </ScrollArea>
+                </TabsContent>
+              </Tabs>
+            </div>
+            
+            {/* Add SchemaActions component for vector operations */}
+            <SchemaActions 
+              databaseInfo={databaseInfo} 
+              isConnected={isConnected} 
+            />
+          </>
         )}
 
         {queryGenerationTime !== null && (

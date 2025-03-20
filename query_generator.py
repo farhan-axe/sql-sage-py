@@ -31,12 +31,22 @@ def generate_query(request: Dict[str, Any]) -> Dict[str, str]:
         prompt_template = request["databaseInfo"].get('promptTemplate', '')
         query_examples = request["databaseInfo"].get('queryExamples', '')
         database_name = request["databaseInfo"].get('connectionConfig', {}).get('database', '')
-
+        
+        # Check if we received relevant schema from vector search
+        relevant_schema = request["databaseInfo"].get('relevantSchema', '')
+        
         # Clean up the database schema format if needed
         clean_schema = prompt_template.replace('### Database Schema:', '').strip()
-        formatted_schema = "Below is the database schema\n" + clean_schema if clean_schema else ""
+        
+        # If we have relevant schema from vector search, use that instead
+        if relevant_schema:
+            formatted_schema = f"Below is the relevant database schema for your question:\n{relevant_schema}"
+            logger.info(f"Using relevant schema from vector search")
+        else:
+            formatted_schema = "Below is the database schema\n" + clean_schema if clean_schema else ""
+            logger.info(f"Using full database schema from prompt template")
 
-        logger.info(f"Database Schema (from prompt_template):\n{prompt_template}\n\n")
+        logger.info(f"Database Schema (formatted):\n{formatted_schema}\n\n")
         logger.info(f"Query Examples:\n{query_examples}\n\n")
         
         # Define the output rules in a separate variable.

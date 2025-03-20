@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -5,6 +6,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { DatabaseInfo } from "@/types/database";
 import { RotateCcw, XCircle, Clock } from "lucide-react";
 import { isNonSqlResponse } from "@/services/sqlServer";
+import { searchSchema } from "@/services/sql/parser";
 
 interface QueryFormProps {
   isConnected: boolean;
@@ -244,6 +246,17 @@ const QueryForm = ({
     try {
       console.log("Starting query generation...");
       
+      // Try to get relevant schema parts from vector search if available
+      let relevantSchema = "";
+      try {
+        console.log("Attempting to retrieve relevant schema for:", questionInput);
+        relevantSchema = await searchSchema(questionInput);
+        console.log("Retrieved relevant schema:", relevantSchema ? "Success" : "Empty result");
+      } catch (error) {
+        console.log("Vector search not available, proceeding with standard query generation:", error);
+        // Continue with normal query generation if vector search fails
+      }
+      
       const generateResponse = await fetchWithTimeout(
         'http://localhost:3001/api/sql/generate',
         {
@@ -253,7 +266,11 @@ const QueryForm = ({
           },
           body: JSON.stringify({
             question: questionInput,
-            databaseInfo,
+            databaseInfo: {
+              ...databaseInfo,
+              // If we got relevant schema from vector search, add it to the request
+              ...(relevantSchema && { relevantSchema })
+            },
             maxRows: 200,
             promptTemplate: databaseInfo.promptTemplate,
             queryExamples: databaseInfo.queryExamples
